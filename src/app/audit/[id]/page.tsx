@@ -1,5 +1,110 @@
 import Link from "next/link"
 import { supabase } from "@/lib/supabase"
+import { formatLocalTimestamp } from "@/lib/date"
+import {
+  analyzeSeoRegression,
+  RegressionAlert,
+  RegressionHealthStatus
+} from "@/utils/seoRegression"
+
+type AuditRow = {
+  id: string
+  url: string
+  average_score: number
+  total_pages: number
+  total_issues: number
+  created_at: string
+}
+
+type CrawledPageRow = {
+  id: string
+  audit_id: string
+  url: string
+  title?: string | null
+  meta_description?: string | null
+  h1s?: string[] | null
+  h2s?: string[] | null
+  seo_score: number
+  word_count: number
+  issues?: string[] | null
+  ai_recommendations?: string | null
+}
+
+function getStatusClasses(
+  status: RegressionHealthStatus
+) {
+  if (status === "Improving") {
+    return "border-green-500/20 bg-green-500/10 text-green-300"
+  }
+
+  if (status === "Warning") {
+    return "border-orange-500/20 bg-orange-500/10 text-orange-300"
+  }
+
+  if (status === "Critical") {
+    return "border-red-500/20 bg-red-500/10 text-red-300"
+  }
+
+  return "border-blue-500/20 bg-blue-500/10 text-blue-300"
+}
+
+function getAlertClasses(
+  alert: RegressionAlert
+) {
+  if (alert.severity === "critical") {
+    return "border-red-500/20 bg-red-500/10 text-red-200"
+  }
+
+  if (alert.severity === "warning") {
+    return "border-orange-500/20 bg-orange-500/10 text-orange-200"
+  }
+
+  if (alert.severity === "positive") {
+    return "border-green-500/20 bg-green-500/10 text-green-200"
+  }
+
+  return "border-zinc-700 bg-zinc-950 text-zinc-300"
+}
+
+function formatDelta(
+  value: number | null
+) {
+  if (value === null) {
+    return "Need more history"
+  }
+
+  if (value === 0) {
+    return "No change"
+  }
+
+  return `${value > 0 ? "+" : ""}${value}`
+}
+
+function AlertCard({
+  alert
+}: {
+  alert: RegressionAlert
+}) {
+  return (
+
+    <div
+      className={`rounded-xl border p-4 ${getAlertClasses(
+        alert
+      )}`}
+    >
+
+      <p className="text-xs font-semibold uppercase tracking-wide opacity-80">
+        {alert.type}
+      </p>
+
+      <p className="mt-2 text-sm font-semibold leading-6">
+        {alert.message}
+      </p>
+
+    </div>
+
+  )
+}
 
 export default async function AuditDetailPage({
   params
@@ -16,11 +121,70 @@ export default async function AuditDetailPage({
       .eq("id", id)
       .single()
 
+  const currentAudit =
+    audit as AuditRow | null
+
   const { data: pages } =
     await supabase
       .from("crawled_pages")
       .select("*")
       .eq("audit_id", id)
+      .order("seo_score", {
+        ascending: false
+      })
+
+  let previousAudit: AuditRow | null = null
+  let previousPages: CrawledPageRow[] = []
+
+  if (currentAudit) {
+
+    const { data: previousAuditData } =
+      await supabase
+        .from("audits")
+        .select("*")
+        .eq("url", currentAudit.url)
+        .lt(
+          "created_at",
+          currentAudit.created_at
+        )
+        .order("created_at", {
+          ascending: false
+        })
+        .limit(1)
+        .maybeSingle()
+
+    previousAudit =
+      previousAuditData as AuditRow | null
+
+    if (previousAudit) {
+
+      const { data: previousPagesData } =
+        await supabase
+          .from("crawled_pages")
+          .select("*")
+          .eq(
+            "audit_id",
+            previousAudit.id
+          )
+
+      previousPages =
+        (previousPagesData ||
+          []) as CrawledPageRow[]
+
+    }
+
+  }
+
+  const currentPages =
+    (pages || []) as CrawledPageRow[]
+
+  const regression =
+    analyzeSeoRegression({
+      currentAudit,
+      previousAudit,
+      currentPages,
+      previousPages
+    })
 
   return (
 
@@ -33,7 +197,7 @@ export default async function AuditDetailPage({
         </h1>
 
         <p className="text-zinc-400 mt-3 break-all">
-          {audit?.url}
+          {currentAudit?.url}
         </p>
 
         <div className="flex flex-wrap gap-4 mt-6">
@@ -70,7 +234,7 @@ export default async function AuditDetailPage({
             </p>
 
             <h2 className="text-5xl font-bold mt-3">
-              {audit?.average_score}
+              {currentAudit?.average_score}
             </h2>
 
           </div>
@@ -82,7 +246,7 @@ export default async function AuditDetailPage({
             </p>
 
             <h2 className="text-5xl font-bold mt-3">
-              {audit?.total_pages}
+              {currentAudit?.total_pages}
             </h2>
 
           </div>
@@ -94,16 +258,107 @@ export default async function AuditDetailPage({
             </p>
 
             <h2 className="text-5xl font-bold mt-3">
-              {audit?.total_issues}
+              {currentAudit?.total_issues}
             </h2>
 
           </div>
 
         </div>
 
+        <section className="mt-10 rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
+
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+
+            <div>
+
+              <h2 className="text-3xl font-bold">
+                Regression Summary
+              </h2>
+
+              <p className="text-zinc-400 mt-2 max-w-3xl">
+                {regression.summary}
+              </p>
+
+              {previousAudit && (
+
+                <p className="text-zinc-500 text-sm mt-3">
+                  Compared with previous audit from{" "}
+                  {formatLocalTimestamp(
+                    previousAudit.created_at
+                  )}
+                </p>
+
+              )}
+
+            </div>
+
+            <div
+              className={`w-fit rounded-xl border px-4 py-3 text-sm font-semibold ${getStatusClasses(
+                regression.status
+              )}`}
+            >
+              {regression.status}
+            </div>
+
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+
+            <div className="rounded-xl bg-zinc-950 p-4">
+              <p className="text-zinc-500 text-sm">
+                Score Change
+              </p>
+              <p className="text-2xl font-bold mt-2">
+                {formatDelta(
+                  regression.scoreDelta
+                )}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-zinc-950 p-4">
+              <p className="text-zinc-500 text-sm">
+                Issue Change
+              </p>
+              <p className="text-2xl font-bold mt-2">
+                {formatDelta(
+                  regression.issueDelta
+                )}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-zinc-950 p-4">
+              <p className="text-zinc-500 text-sm">
+                Page Count Change
+              </p>
+              <p className="text-2xl font-bold mt-2">
+                {formatDelta(
+                  regression.pagesDelta
+                )}
+              </p>
+            </div>
+
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-6">
+
+            {regression.alerts.map(
+              (alert, index) => (
+
+                <AlertCard
+                  key={`${alert.message}-${index}`}
+                  alert={alert}
+                />
+
+              )
+            )}
+
+          </div>
+
+        </section>
+
         <div className="mt-10 space-y-8">
 
-          {pages?.map((page) => (
+          {currentPages.map((page) => (
 
             <div
               key={page.id}

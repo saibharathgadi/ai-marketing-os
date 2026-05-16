@@ -10,6 +10,12 @@ import {
   YAxis
 } from "recharts"
 import { formatLocalTimestamp } from "@/lib/date"
+import {
+  analyzeSeoRegression,
+  getChronologicalRegressionAudits,
+  RegressionAlert,
+  RegressionHealthStatus
+} from "@/utils/seoRegression"
 
 type Audit = {
   id: string
@@ -18,12 +24,6 @@ type Audit = {
   total_pages: number
   created_at: string
 }
-
-type HealthStatus =
-  | "Improving"
-  | "Stable"
-  | "Declining"
-  | "Critical"
 
 type TrendPoint = {
   id: string
@@ -39,16 +39,6 @@ const gridColor = "#27272f"
 const scoreColor = "#60a5fa"
 const issuesColor = "#f87171"
 const pagesColor = "#34d399"
-
-function getChronologicalAudits(
-  audits: Audit[]
-) {
-  return [...audits].sort(
-    (a, b) =>
-      new Date(a.created_at).getTime() -
-      new Date(b.created_at).getTime()
-  )
-}
 
 function getChartLabel(
   createdAt: string,
@@ -71,35 +61,24 @@ function getChartLabel(
 function buildTrendData(
   audits: Audit[]
 ) {
-  return getChronologicalAudits(audits).map(
-    (audit, index) => ({
-      id: audit.id,
-      label: getChartLabel(
-        audit.created_at,
-        index
-      ),
-      fullDate: formatLocalTimestamp(
-        audit.created_at
-      ),
-      score:
-        audit.average_score,
-      issues:
-        audit.total_issues,
-      pages:
-        audit.total_pages
-    })
-  )
-}
-
-function getDelta(
-  current: number,
-  previous: number | null
-) {
-  if (previous === null) {
-    return null
-  }
-
-  return current - previous
+  return getChronologicalRegressionAudits(
+    audits
+  ).map((audit, index) => ({
+    id: audit.id,
+    label: getChartLabel(
+      audit.created_at,
+      index
+    ),
+    fullDate: formatLocalTimestamp(
+      audit.created_at
+    ),
+    score:
+      audit.average_score,
+    issues:
+      audit.total_issues,
+    pages:
+      audit.total_pages
+  }))
 }
 
 function formatDelta(
@@ -119,55 +98,14 @@ function formatDelta(
   return `${sign}${value}${suffix}`
 }
 
-function getHealthStatus(
-  latest: TrendPoint | undefined,
-  previous: TrendPoint | undefined
-): HealthStatus {
-  if (!latest) {
-    return "Stable"
-  }
-
-  if (
-    latest.score < 55 ||
-    latest.issues >= 25
-  ) {
-    return "Critical"
-  }
-
-  if (!previous) {
-    return "Stable"
-  }
-
-  const scoreDelta =
-    latest.score - previous.score
-  const issueDelta =
-    latest.issues - previous.issues
-
-  if (
-    scoreDelta >= 5 &&
-    issueDelta <= 0
-  ) {
-    return "Improving"
-  }
-
-  if (
-    scoreDelta <= -5 ||
-    issueDelta >= 5
-  ) {
-    return "Declining"
-  }
-
-  return "Stable"
-}
-
 function getStatusClasses(
-  status: HealthStatus
+  status: RegressionHealthStatus
 ) {
   if (status === "Improving") {
     return "border-green-500/20 bg-green-500/10 text-green-300"
   }
 
-  if (status === "Declining") {
+  if (status === "Warning") {
     return "border-orange-500/20 bg-orange-500/10 text-orange-300"
   }
 
@@ -178,51 +116,22 @@ function getStatusClasses(
   return "border-blue-500/20 bg-blue-500/10 text-blue-300"
 }
 
-function getTrendSummary(
-  trendData: TrendPoint[]
+function getAlertClasses(
+  alert: RegressionAlert
 ) {
-  const latest =
-    trendData[trendData.length - 1]
-  const previous =
-    trendData.length > 1
-      ? trendData[trendData.length - 2]
-      : undefined
-
-  const scoreDelta =
-    latest && previous
-      ? getDelta(
-          latest.score,
-          previous.score
-        )
-      : null
-
-  const issuesDelta =
-    latest && previous
-      ? getDelta(
-          latest.issues,
-          previous.issues
-        )
-      : null
-
-  const pagesDelta =
-    latest && previous
-      ? getDelta(
-          latest.pages,
-          previous.pages
-        )
-      : null
-
-  return {
-    latest,
-    previous,
-    scoreDelta,
-    issuesDelta,
-    pagesDelta,
-    status: getHealthStatus(
-      latest,
-      previous
-    )
+  if (alert.severity === "critical") {
+    return "border-red-500/20 bg-red-500/10 text-red-200"
   }
+
+  if (alert.severity === "warning") {
+    return "border-orange-500/20 bg-orange-500/10 text-orange-200"
+  }
+
+  if (alert.severity === "positive") {
+    return "border-green-500/20 bg-green-500/10 text-green-200"
+  }
+
+  return "border-zinc-700 bg-zinc-950 text-zinc-300"
 }
 
 function TrendSummaryCard({
@@ -248,6 +157,32 @@ function TrendSummaryCard({
 
       <p className="text-zinc-500 text-sm mt-3">
         {detail}
+      </p>
+
+    </div>
+
+  )
+}
+
+function AlertCard({
+  alert
+}: {
+  alert: RegressionAlert
+}) {
+  return (
+
+    <div
+      className={`rounded-2xl border p-5 ${getAlertClasses(
+        alert
+      )}`}
+    >
+
+      <p className="text-xs font-semibold uppercase tracking-wide opacity-80">
+        {alert.type}
+      </p>
+
+      <p className="mt-3 text-sm font-semibold leading-6">
+        {alert.message}
       </p>
 
     </div>
@@ -362,16 +297,26 @@ export default function DashboardCharts({
   audits: Audit[]
 }) {
 
+  const chronologicalAudits =
+    getChronologicalRegressionAudits(audits)
+  const latestAudit =
+    chronologicalAudits[
+      chronologicalAudits.length - 1
+    ]
+  const previousAudit =
+    chronologicalAudits.length > 1
+      ? chronologicalAudits[
+          chronologicalAudits.length - 2
+        ]
+      : undefined
   const trendData =
     buildTrendData(audits)
-
-  const {
-    latest,
-    scoreDelta,
-    issuesDelta,
-    pagesDelta,
-    status
-  } = getTrendSummary(trendData)
+  const regression =
+    analyzeSeoRegression({
+      currentAudit:
+        latestAudit,
+      previousAudit
+    })
 
   return (
 
@@ -393,18 +338,18 @@ export default function DashboardCharts({
 
         <div
           className={`w-fit rounded-xl border px-4 py-3 text-sm font-semibold ${getStatusClasses(
-            status
+            regression.status
           )}`}
         >
-          {status}
+          {regression.status}
         </div>
 
       </div>
 
-      {trendData.length < 2 && (
+      {!regression.hasEnoughHistory && (
 
         <div className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-900 p-5 text-zinc-400">
-          Run at least two audits to unlock full trend comparison.
+          Run at least two audits to unlock regression detection.
         </div>
 
       )}
@@ -414,12 +359,12 @@ export default function DashboardCharts({
         <TrendSummaryCard
           label="Latest SEO Score"
           value={
-            latest
-              ? `${latest.score}/100`
+            latestAudit
+              ? `${latestAudit.average_score}/100`
               : "No data"
           }
           detail={formatDelta(
-            scoreDelta,
+            regression.scoreDelta,
             " since last audit"
           )}
         />
@@ -427,12 +372,14 @@ export default function DashboardCharts({
         <TrendSummaryCard
           label="Latest Issues"
           value={
-            latest
-              ? String(latest.issues)
+            latestAudit
+              ? String(
+                  latestAudit.total_issues
+                )
               : "No data"
           }
           detail={formatDelta(
-            issuesDelta,
+            regression.issueDelta,
             " since last audit"
           )}
         />
@@ -440,12 +387,14 @@ export default function DashboardCharts({
         <TrendSummaryCard
           label="Pages Crawled"
           value={
-            latest
-              ? String(latest.pages)
+            latestAudit
+              ? String(
+                  latestAudit.total_pages
+                )
               : "No data"
           }
           detail={formatDelta(
-            pagesDelta,
+            regression.pagesDelta,
             " since last audit"
           )}
         />
@@ -455,6 +404,37 @@ export default function DashboardCharts({
           value={String(audits.length)}
           detail="Total audits tracked"
         />
+
+      </div>
+
+      <div className="mt-6">
+
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+
+          <h3 className="text-2xl font-semibold">
+            Regression Alerts
+          </h3>
+
+          <p className="text-zinc-500 text-sm">
+            {regression.summary}
+          </p>
+
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-4">
+
+          {regression.alerts
+            .slice(0, 3)
+            .map((alert, index) => (
+
+              <AlertCard
+                key={`${alert.message}-${index}`}
+                alert={alert}
+              />
+
+            ))}
+
+        </div>
 
       </div>
 

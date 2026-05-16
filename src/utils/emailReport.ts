@@ -1,3 +1,5 @@
+import type { RegressionAnalysis } from "./seoRegression"
+
 type EmailAuditRow = {
   id?: string
   url: string
@@ -21,6 +23,12 @@ type SendSeoReportEmailInput = {
   pages: EmailPageRow[]
   pdfBytes: Uint8Array
   reportId: string
+}
+
+type SendSeoRegressionAlertEmailInput = {
+  to: string
+  audit: EmailAuditRow
+  regression: RegressionAnalysis
 }
 
 type ResendSuccessResponse = {
@@ -242,6 +250,95 @@ function buildReportText(
   ].join("\n")
 }
 
+function buildRegressionAlertHtml(
+  audit: EmailAuditRow,
+  regression: RegressionAnalysis
+) {
+  const alertItems =
+    regression.alerts
+      .map(
+        (alert) =>
+          `<li style="margin:0 0 10px 0;color:#d4d4d8;line-height:1.5;">${escapeHtml(
+            alert.message
+          )}</li>`
+      )
+      .join("")
+
+  return `<!doctype html>
+<html>
+  <body style="margin:0;background:#09090b;color:#fafafa;font-family:Arial,Helvetica,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#09090b;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:680px;background:#111217;border:1px solid #2f333d;border-radius:12px;overflow:hidden;">
+            <tr>
+              <td style="padding:32px;border-bottom:1px solid #2f333d;">
+                <div style="font-size:13px;font-weight:700;color:#60a5fa;letter-spacing:0.04em;text-transform:uppercase;">AI Marketing OS</div>
+                <h1 style="margin:12px 0 10px 0;color:#ffffff;font-size:28px;line-height:1.2;">SEO Regression Alert</h1>
+                <p style="margin:0;color:#a1a1aa;font-size:14px;line-height:1.6;">${escapeHtml(
+                  audit.url
+                )}</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px 32px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="width:33.333%;padding:14px;background:#181a20;border:1px solid #2f333d;">
+                      <div style="font-size:12px;color:#a1a1aa;">Health</div>
+                      <div style="margin-top:8px;font-size:22px;font-weight:700;color:#ffffff;">${escapeHtml(
+                        regression.status
+                      )}</div>
+                    </td>
+                    <td style="width:33.333%;padding:14px;background:#181a20;border:1px solid #2f333d;">
+                      <div style="font-size:12px;color:#a1a1aa;">SEO Score</div>
+                      <div style="margin-top:8px;font-size:22px;font-weight:700;color:#ffffff;">${audit.average_score}/100</div>
+                    </td>
+                    <td style="width:33.333%;padding:14px;background:#181a20;border:1px solid #2f333d;">
+                      <div style="font-size:12px;color:#a1a1aa;">Total Issues</div>
+                      <div style="margin-top:8px;font-size:22px;font-weight:700;color:#ffffff;">${audit.total_issues}</div>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:24px 0 0 0;color:#d4d4d8;font-size:14px;line-height:1.6;">${escapeHtml(
+                  regression.summary
+                )}</p>
+                <h2 style="margin:28px 0 12px 0;color:#ffffff;font-size:18px;">Detected Changes</h2>
+                <ul style="margin:0;padding-left:20px;">
+                  ${alertItems}
+                </ul>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`
+}
+
+function buildRegressionAlertText(
+  audit: EmailAuditRow,
+  regression: RegressionAnalysis
+) {
+  return [
+    "AI Marketing OS - SEO Regression Alert",
+    "",
+    `Website: ${audit.url}`,
+    `Health: ${regression.status}`,
+    `SEO Score: ${audit.average_score}/100`,
+    `Pages Crawled: ${audit.total_pages}`,
+    `Total Issues: ${audit.total_issues}`,
+    "",
+    regression.summary,
+    "",
+    "Detected Changes:",
+    ...regression.alerts.map(
+      (alert) => `- ${alert.message}`
+    )
+  ].join("\n")
+}
+
 function getPdfBase64(pdfBytes: Uint8Array) {
   return Buffer.from(pdfBytes).toString("base64")
 }
@@ -351,6 +448,96 @@ export async function sendSeoReportEmail({
         error instanceof Error
           ? error.message
           : "Failed to send report email."
+    }
+  }
+}
+
+export async function sendSeoRegressionAlertEmail({
+  to,
+  audit,
+  regression
+}: SendSeoRegressionAlertEmailInput): Promise<SendSeoReportEmailResult> {
+  if (!validateReportRecipient(to)) {
+    return {
+      success: false,
+      error: "A valid recipient email is required."
+    }
+  }
+
+  const apiKey = process.env.RESEND_API_KEY
+
+  if (!apiKey) {
+    return {
+      success: false,
+      error:
+        "RESEND_API_KEY is not configured."
+    }
+  }
+
+  try {
+    const response = await fetch(resendApiUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        from: getFromEmail(),
+        to: [to],
+        subject:
+          `SEO ${regression.status} Alert: ${audit.url}`,
+        html: buildRegressionAlertHtml(
+          audit,
+          regression
+        ),
+        text: buildRegressionAlertText(
+          audit,
+          regression
+        ),
+        tags: [
+          {
+            name: "category",
+            value: "seo-regression-alert"
+          }
+        ]
+      })
+    })
+
+    const result =
+      (await response.json().catch(() => null)) as
+        | ResendSuccessResponse
+        | { message?: string }
+        | null
+
+    if (!response.ok) {
+      const message =
+        result &&
+        "message" in result &&
+        result.message
+          ? result.message
+          : "Failed to send regression alert email."
+
+      return {
+        success: false,
+        error: message
+      }
+    }
+
+    return {
+      success: true,
+      emailId:
+        result &&
+        "id" in result
+          ? result.id
+          : undefined
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to send regression alert email."
     }
   }
 }
