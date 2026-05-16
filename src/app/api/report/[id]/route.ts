@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase"
 import { generatePDFReport } from "@/utils/pdfReport"
 
 export async function GET(
-  request: Request,
+  _request: Request,
   context: {
     params: Promise<{ id: string }>
   }
@@ -57,7 +57,13 @@ export async function GET(
         "application/pdf",
 
       "Content-Disposition":
-        `attachment; filename="seo-report-${id}.pdf"`
+        `attachment; filename="seo-report-${id}.pdf"`,
+
+      "Content-Length":
+        String(pdfBody.byteLength),
+
+      "Cache-Control":
+        "private, no-store, max-age=0"
     }
   })
 
