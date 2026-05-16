@@ -3,6 +3,10 @@ import { analyzeTechnicalSeo } from "./technicalSeo"
 import { supabase } from "@/lib/supabase"
 import { generateAIRecommendations } from "./aiRecommendations"
 
+type TechnicalSeoResult = Awaited<
+  ReturnType<typeof analyzeTechnicalSeo>
+>
+
 type PageSnapshot = {
   finalUrl: string
   html: string
@@ -20,18 +24,37 @@ type CrawledPage = ReturnType<typeof analyzePage> & {
   aiRecommendations: string
 }
 
+type AuditInsertPayload = {
+  url: string
+  average_score: number
+  total_pages: number
+  total_issues: number
+  technical_seo?: TechnicalSeoResult
+}
+
+type AuditInsertResult = {
+  id: string
+}
+
 export function extractInternalLinks(
   links: string[],
   baseUrl: string
 ) {
 
+  const base = new URL(baseUrl)
+  const normalizedBase =
+    normalizeUrlForComparison(base.href)
+
   const internalLinks = links.filter((link) => {
 
     try {
 
+      const candidate = new URL(link)
+
       return (
-        new URL(link).hostname ===
-        new URL(baseUrl).hostname
+        candidate.hostname === base.hostname &&
+        normalizeUrlForComparison(candidate.href) !==
+          normalizedBase
       )
 
     } catch {
@@ -43,6 +66,23 @@ export function extractInternalLinks(
   })
 
   return [...new Set(internalLinks)].slice(0, 5)
+
+}
+
+function normalizeUrlForComparison(url: string) {
+
+  const parsed = new URL(url)
+
+  parsed.hash = ""
+
+  if (
+    parsed.pathname !== "/" &&
+    parsed.pathname.endsWith("/")
+  ) {
+    parsed.pathname = parsed.pathname.slice(0, -1)
+  }
+
+  return parsed.href
 
 }
 
@@ -189,6 +229,110 @@ async function loadPage(
 
 }
 
+async function createAuditRecord(
+  payload: AuditInsertPayload
+) {
+
+  const withTechnicalSeo =
+    await supabase
+      .from("audits")
+      .insert(payload)
+      .select("id")
+      .single()
+
+  if (!withTechnicalSeo.error) {
+    return withTechnicalSeo.data as AuditInsertResult
+  }
+
+  const message =
+    withTechnicalSeo.error.message.toLowerCase()
+
+  const missingTechnicalSeoColumn =
+    message.includes("technical_seo") ||
+    message.includes("schema cache")
+
+  if (!missingTechnicalSeoColumn) {
+    throw new Error(
+      `Failed to create audit: ${withTechnicalSeo.error.message}`
+    )
+  }
+
+  console.warn(
+    "technical_seo column is missing on audits; continuing without persisted technical SEO."
+  )
+
+  const fallbackPayload = {
+    url: payload.url,
+    average_score:
+      payload.average_score,
+    total_pages:
+      payload.total_pages,
+    total_issues:
+      payload.total_issues
+  }
+
+  const withoutTechnicalSeo =
+    await supabase
+      .from("audits")
+      .insert(fallbackPayload)
+      .select("id")
+      .single()
+
+  if (withoutTechnicalSeo.error) {
+    throw new Error(
+      `Failed to create audit: ${withoutTechnicalSeo.error.message}`
+    )
+  }
+
+  return withoutTechnicalSeo.data as AuditInsertResult
+
+}
+
+async function persistCrawledPages(
+  auditId: string,
+  crawledPages: CrawledPage[]
+) {
+
+  const pagesToInsert =
+    crawledPages.map((page) => ({
+
+      audit_id: auditId,
+
+      url: page.url,
+
+      title: page.title,
+
+      meta_description:
+        page.metaDescription,
+
+      h1s: page.h1s,
+
+      h2s: page.h2s,
+
+      seo_score: page.seoScore,
+
+      word_count: page.wordCount,
+
+      issues: page.seoIssues,
+
+      ai_recommendations:
+        page.aiRecommendations
+
+    }))
+
+  const { error } =
+    await supabase
+      .from("crawled_pages")
+      .insert(pagesToInsert)
+
+  if (error) {
+    throw new Error(
+      `Failed to persist crawled pages: ${error.message}`
+    )
+  }
+
+}
+
 export async function crawlWebsite(url: string) {
 
   const homepage =
@@ -209,12 +353,6 @@ export async function crawlWebsite(url: string) {
 
   }
 
-  const internalLinks =
-    extractInternalLinks(
-      homepage.links,
-      homepage.finalUrl
-    )
-
   const homepageAnalysis =
     analyzePage({
       title: homepage.title,
@@ -228,13 +366,31 @@ export async function crawlWebsite(url: string) {
         homepage.links.length
     })
 
+  const homepageRecommendations =
+    await generateAIRecommendations(
+      homepageAnalysis
+    )
+
   const technicalSeo =
     await analyzeTechnicalSeo(
       homepage.html,
       homepage.finalUrl
     )
 
-  const crawledPages: CrawledPage[] = []
+  const crawledPages: CrawledPage[] = [
+    {
+      url: homepage.finalUrl,
+      ...homepageAnalysis,
+      aiRecommendations:
+        homepageRecommendations
+    }
+  ]
+
+  const internalLinks =
+    extractInternalLinks(
+      homepage.links,
+      homepage.finalUrl
+    )
 
   for (const link of internalLinks) {
 
@@ -278,7 +434,7 @@ export async function crawlWebsite(url: string) {
         )
 
       crawledPages.push({
-        url: link,
+        url: subPage.finalUrl || link,
         ...analysis,
         aiRecommendations
       })
@@ -296,15 +452,13 @@ export async function crawlWebsite(url: string) {
   }
 
   const averageSeoScore =
-    crawledPages.length > 0
-      ? Math.round(
-          crawledPages.reduce(
-            (acc, page) =>
-              acc + page.seoScore,
-            0
-          ) / crawledPages.length
-        )
-      : homepageAnalysis.seoScore
+    Math.round(
+      crawledPages.reduce(
+        (acc, page) =>
+          acc + page.seoScore,
+        0
+      ) / crawledPages.length
+    )
 
   const totalIssues =
     crawledPages.reduce(
@@ -314,34 +468,22 @@ export async function crawlWebsite(url: string) {
     )
 
   const bestPage =
-    crawledPages.length > 0
-      ? crawledPages.reduce(
-          (best, current) =>
-            current.seoScore >
-            best.seoScore
-              ? current
-              : best
-        )
-      : {
-          url,
-          seoScore:
-            homepageAnalysis.seoScore
-        }
+    crawledPages.reduce(
+      (best, current) =>
+        current.seoScore >
+        best.seoScore
+          ? current
+          : best
+    )
 
   const worstPage =
-    crawledPages.length > 0
-      ? crawledPages.reduce(
-          (worst, current) =>
-            current.seoScore <
-            worst.seoScore
-              ? current
-              : worst
-        )
-      : {
-          url,
-          seoScore:
-            homepageAnalysis.seoScore
-        }
+    crawledPages.reduce(
+      (worst, current) =>
+        current.seoScore <
+        worst.seoScore
+          ? current
+          : worst
+    )
 
   const siteSummary = {
 
@@ -358,56 +500,36 @@ export async function crawlWebsite(url: string) {
 
   }
 
-  const { data: auditData } =
-    await supabase
-      .from("audits")
-      .insert({
+  try {
+
+    const auditData =
+      await createAuditRecord({
         url,
         average_score:
           averageSeoScore,
         total_pages:
           crawledPages.length,
         total_issues:
-          totalIssues
+          totalIssues,
+        technical_seo:
+          technicalSeo
       })
-      .select()
-      .single()
 
-  if (auditData) {
+    await persistCrawledPages(
+      auditData.id,
+      crawledPages
+    )
 
-    const pagesToInsert =
-      crawledPages.map((page) => ({
+  } catch (error) {
 
-        audit_id: auditData.id,
+    console.error(error)
 
-        url: page.url,
-
-        title: page.title,
-
-        meta_description:
-          page.metaDescription,
-
-        h1s: page.h1s,
-
-        h2s: page.h2s,
-
-        seo_score: page.seoScore,
-
-        word_count: page.wordCount,
-
-        issues: page.seoIssues,
-
-        ai_recommendations:
-          page.aiRecommendations
-
-      }))
-
-    if (pagesToInsert.length > 0) {
-
-      await supabase
-        .from("crawled_pages")
-        .insert(pagesToInsert)
-
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to save audit data."
     }
 
   }

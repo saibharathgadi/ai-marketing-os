@@ -19,12 +19,6 @@ export async function GET(
       .eq("id", id)
       .single()
 
-  const { data: pages } =
-    await supabase
-      .from("crawled_pages")
-      .select("*")
-      .eq("audit_id", id)
-
   if (!audit) {
 
     return NextResponse.json(
@@ -34,6 +28,34 @@ export async function GET(
       },
       {
         status: 404
+      }
+    )
+
+  }
+
+  const { data: pages, error: pagesError } =
+    await supabase
+      .from("crawled_pages")
+      .select("*")
+      .eq("audit_id", id)
+      .order("seo_score", {
+        ascending: false
+      })
+
+  if (pagesError) {
+
+    console.error(
+      "Failed to fetch crawled pages for report:",
+      pagesError
+    )
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to load report page data"
+      },
+      {
+        status: 500
       }
     )
 
