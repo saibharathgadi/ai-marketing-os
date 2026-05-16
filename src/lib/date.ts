@@ -1,3 +1,6 @@
+const appLocale = "en-IN"
+const appTimeZone = "Asia/Kolkata"
+
 function hasExplicitTimezone(value: string) {
   return /(?:z|[+-]\d{2}:?\d{2})$/i.test(
     value
@@ -46,10 +49,12 @@ export function formatLocalTimestamp(
   }
 
   return new Intl.DateTimeFormat(
-    undefined,
+    appLocale,
     {
       dateStyle: "medium",
-      timeStyle: "short"
+      timeStyle: "short",
+      timeZone:
+        appTimeZone
     }
   ).format(date)
 }
