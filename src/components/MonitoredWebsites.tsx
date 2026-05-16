@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { formatLocalTimestamp } from "@/lib/date"
 
 type Website = {
   id: string
@@ -350,23 +351,9 @@ export default function MonitoredWebsites({
                   Last audited:
                   {" "}
 
-                  {website.last_audited_at
-                    ? new Date(
-                        website.last_audited_at
-                      ).toLocaleString(
-                        "en-IN",
-                        {
-                          dateStyle:
-                            "medium",
-
-                          timeStyle:
-                            "short",
-
-                          timeZone:
-                            "Asia/Kolkata"
-                        }
-                      )
-                    : "Never"}
+                  {formatLocalTimestamp(
+                    website.last_audited_at
+                  )}
 
                 </p>
 
@@ -384,7 +371,7 @@ export default function MonitoredWebsites({
                     runningAudit ===
                     website.url
                   }
-                  className="rounded-xl bg-white text-black px-5 py-3 font-semibold disabled:opacity-50"
+                  className="rounded-xl bg-green-600 px-5 py-3 font-semibold disabled:opacity-50"
                 >
 
                   {runningAudit ===
@@ -400,7 +387,7 @@ export default function MonitoredWebsites({
                       website.id
                     )
                   }
-                  className="rounded-xl bg-red-500/20 border border-red-500/30 px-5 py-3 text-red-300"
+                  className="rounded-xl bg-red-600 px-5 py-3 font-semibold"
                 >
                   Delete
                 </button>

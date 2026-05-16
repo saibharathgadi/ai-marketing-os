@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { supabase } from "@/lib/supabase"
+import { formatLocalTimestamp } from "@/lib/date"
 import DashboardCharts from "@/components/DashboardCharts"
 import MonitoredWebsites from "@/components/MonitoredWebsites"
 
@@ -249,23 +250,9 @@ export default function DashboardPage() {
                 </div>
 
                 <p className="text-zinc-500 text-sm mt-8">
-
-                  {new Date(
+                  {formatLocalTimestamp(
                     audit.created_at
-                  ).toLocaleString(
-                    "en-IN",
-                    {
-                      dateStyle:
-                        "medium",
-
-                      timeStyle:
-                        "short",
-
-                      timeZone:
-                        "Asia/Kolkata"
-                    }
                   )}
-
                 </p>
 
               </div>
