@@ -27,6 +27,9 @@ export default function MonitoredWebsites({
   const [runningAudit, setRunningAudit] =
     useState<string | null>(null)
 
+  const [statusMessage, setStatusMessage] =
+    useState<string | null>(null)
+
   useEffect(() => {
 
     loadWebsites()
@@ -104,7 +107,14 @@ export default function MonitoredWebsites({
       const result =
         await response.json()
 
-      if (!result.success) return
+      if (!result.success) {
+        setStatusMessage(
+          result.error ||
+            "Failed to save website."
+        )
+
+        return
+      }
 
       setWebsites((prev) => [
         result.data,
@@ -112,6 +122,9 @@ export default function MonitoredWebsites({
       ])
 
       setUrl("")
+      setStatusMessage(
+        "Website saved."
+      )
 
     } catch (error) {
 
@@ -149,13 +162,24 @@ export default function MonitoredWebsites({
       const result =
         await response.json()
 
-      if (!result.success) return
+      if (!result.success) {
+        setStatusMessage(
+          result.error ||
+            "Failed to delete website."
+        )
+
+        return
+      }
 
       setWebsites((prev) =>
         prev.filter(
           (website) =>
             website.id !== id
         )
+      )
+
+      setStatusMessage(
+        "Website removed."
       )
 
     } catch (error) {
@@ -195,8 +219,9 @@ export default function MonitoredWebsites({
 
       if (!result.success) {
 
-        alert(
-          "Audit failed."
+        setStatusMessage(
+          result.error ||
+            "Audit failed."
         )
 
         return
@@ -207,7 +232,7 @@ export default function MonitoredWebsites({
 
       await onAuditCompleted()
 
-      alert(
+      setStatusMessage(
         "Audit completed successfully."
       )
 
@@ -215,7 +240,7 @@ export default function MonitoredWebsites({
 
       console.error(error)
 
-      alert(
+      setStatusMessage(
         "Failed to run audit."
       )
 
@@ -233,21 +258,42 @@ export default function MonitoredWebsites({
 
       setLoading(true)
 
-      await fetch(
-        "/api/run-scheduled-audits"
-      )
+      const response =
+        await fetch(
+          "/api/run-scheduled-audits"
+        )
+
+      const result =
+        await response.json()
+
+      if (!result.success) {
+        setStatusMessage(
+          result.error ||
+            "Failed to run scheduled audits."
+        )
+
+        return
+      }
 
       await loadWebsites()
 
       await onAuditCompleted()
 
-      alert(
-        "Scheduled audits completed."
+      const failedCount =
+        result.results?.filter(
+          (item: { success: boolean }) =>
+            !item.success
+        ).length || 0
+
+      setStatusMessage(
+        failedCount > 0
+          ? `Scheduled audits completed with ${failedCount} skipped or failed.`
+          : "Scheduled audits completed."
       )
 
     } catch {
 
-      alert(
+      setStatusMessage(
         "Failed to run scheduled audits."
       )
 
@@ -318,6 +364,14 @@ export default function MonitoredWebsites({
         </button>
 
       </div>
+
+      {statusMessage && (
+
+        <div className="mt-5 rounded-xl border border-zinc-800 bg-zinc-950 p-4 text-sm text-zinc-300">
+          {statusMessage}
+        </div>
+
+      )}
 
       <div className="space-y-4 mt-8">
 

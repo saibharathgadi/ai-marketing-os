@@ -1,15 +1,82 @@
 import { NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase"
-import { crawlWebsite } from "@/utils/crawler"
+import { enqueueAudit } from "@/utils/auditQueue"
+import {
+  checkRateLimit,
+  getRequestKey
+} from "@/utils/rateLimit"
 
-export async function GET() {
+function isAuthorizedRequest(request: Request) {
+  const cronSecret =
+    process.env.CRON_SECRET
+
+  if (!cronSecret) {
+    return true
+  }
+
+  const authorization =
+    request.headers.get("authorization")
+
+  const cronHeader =
+    request.headers.get("x-cron-secret")
+
+  return (
+    authorization === `Bearer ${cronSecret}` ||
+    cronHeader === cronSecret
+  )
+}
+
+export async function GET(request: Request) {
+
+  if (!isAuthorizedRequest(request)) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Unauthorized"
+      },
+      {
+        status: 401
+      }
+    )
+  }
+
+  const rateLimit =
+    checkRateLimit({
+      key: getRequestKey(
+        request,
+        "scheduled-audits"
+      ),
+      limit: 3,
+      windowMs: 60_000
+    })
+
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "Too many scheduled audit requests. Please try again shortly.",
+        retryAfterSeconds:
+          rateLimit.retryAfterSeconds
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After":
+            String(
+              rateLimit.retryAfterSeconds
+            )
+        }
+      }
+    )
+  }
 
   try {
 
     const { data: websites, error } =
       await supabase
         .from("monitored_websites")
-        .select("*")
+        .select("id,url")
 
     if (error) {
 
@@ -37,24 +104,34 @@ export async function GET() {
         )
 
         const auditResult =
-          await crawlWebsite(
+          await enqueueAudit(
             website.url
           )
 
-        await supabase
-          .from("monitored_websites")
-          .update({
-            last_audited_at:
-              new Date().toISOString()
-          })
-          .eq("id", website.id)
+        if (auditResult.success) {
+          await supabase
+            .from("monitored_websites")
+            .update({
+              last_audited_at:
+                new Date().toISOString()
+            })
+            .eq("id", website.id)
+        }
 
         results.push({
 
           website: website.url,
 
           success:
+            auditResult.success,
+
+          status:
+            auditResult.status,
+
+          error:
             auditResult.success
+              ? undefined
+              : auditResult.error
 
         })
 

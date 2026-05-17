@@ -23,7 +23,9 @@ export function analyzePage(
   } = data
 
   const wordCount =
-    text.split(/\s+/).length
+    text.trim()
+      ? text.trim().split(/\s+/).length
+      : 0
 
   const seoIssues: string[] = []
 

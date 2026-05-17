@@ -34,6 +34,12 @@ type TrendPoint = {
   pages: number
 }
 
+type QueueMetrics = {
+  queued: number
+  running: number
+  failed: number
+}
+
 const axisColor = "#71717a"
 const gridColor = "#27272f"
 const scoreColor = "#60a5fa"
@@ -190,6 +196,36 @@ function AlertCard({
   )
 }
 
+function QueueMetricCard({
+  label,
+  value,
+  detail
+}: {
+  label: string
+  value: number
+  detail: string
+}) {
+  return (
+
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
+
+      <p className="text-zinc-500 text-sm">
+        {label}
+      </p>
+
+      <h3 className="text-3xl font-bold mt-3">
+        {value}
+      </h3>
+
+      <p className="text-zinc-500 text-sm mt-3">
+        {detail}
+      </p>
+
+    </div>
+
+  )
+}
+
 function ChartPanel({
   title,
   dataKey,
@@ -292,9 +328,15 @@ function ChartPanel({
 }
 
 export default function DashboardCharts({
-  audits
+  audits,
+  queueMetrics = {
+    queued: 0,
+    running: 0,
+    failed: 0
+  }
 }: {
   audits: Audit[]
+  queueMetrics?: QueueMetrics
 }) {
 
   const chronologicalAudits =
@@ -404,6 +446,44 @@ export default function DashboardCharts({
           value={String(audits.length)}
           detail="Total audits tracked"
         />
+
+      </div>
+
+      <div className="mt-6">
+
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+
+          <h3 className="text-2xl font-semibold">
+            Crawl Queue
+          </h3>
+
+          <p className="text-zinc-500 text-sm">
+            Current in-memory audit queue activity.
+          </p>
+
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
+
+          <QueueMetricCard
+            label="Running"
+            value={queueMetrics.running}
+            detail="Audits actively crawling"
+          />
+
+          <QueueMetricCard
+            label="Queued"
+            value={queueMetrics.queued}
+            detail="Audits waiting for capacity"
+          />
+
+          <QueueMetricCard
+            label="Failed"
+            value={queueMetrics.failed}
+            detail="Failed queue jobs in this warm instance"
+          />
+
+        </div>
 
       </div>
 

@@ -5,6 +5,10 @@ import {
   sendSeoReportEmail,
   validateReportRecipient
 } from "@/utils/emailReport"
+import {
+  checkRateLimit,
+  getRequestKey
+} from "@/utils/rateLimit"
 
 type EmailRequestBody = {
   to?: string
@@ -16,6 +20,37 @@ export async function POST(
     params: Promise<{ id: string }>
   }
 ) {
+
+  const rateLimit =
+    checkRateLimit({
+      key: getRequestKey(
+        request,
+        "email-report"
+      ),
+      limit: 5,
+      windowMs: 60_000
+    })
+
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "Too many email requests. Please try again shortly.",
+        retryAfterSeconds:
+          rateLimit.retryAfterSeconds
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After":
+            String(
+              rateLimit.retryAfterSeconds
+            )
+        }
+      }
+    )
+  }
 
   const { id } =
     await context.params
@@ -78,11 +113,14 @@ export async function POST(
   const { data: pages, error: pagesError } =
     await supabase
       .from("crawled_pages")
-      .select("*")
+      .select(
+        "id,audit_id,url,title,meta_description,h1s,h2s,seo_score,word_count,issues,ai_recommendations"
+      )
       .eq("audit_id", id)
       .order("seo_score", {
         ascending: false
       })
+      .limit(25)
 
   if (pagesError) {
 

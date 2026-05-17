@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase"
+import { validateWebsiteUrl } from "@/utils/urlValidation"
 
 export async function GET() {
 
   const { data, error } =
     await supabase
       .from("monitored_websites")
-      .select("*")
+      .select("id,url,last_audited_at,created_at")
       .order("created_at", {
         ascending: false
       })
@@ -36,16 +37,45 @@ export async function POST(
   request: Request
 ) {
 
-  const body =
-    await request.json()
+  let body: unknown
 
-  const { url } = body
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "Request body must be valid JSON."
+      },
+      {
+        status: 400
+      }
+    )
+  }
+
+  const urlValidation =
+    validateWebsiteUrl(
+      (body as { url?: unknown }).url
+    )
+
+  if (!urlValidation.success) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: urlValidation.error
+      },
+      {
+        status: 400
+      }
+    )
+  }
 
   const { data, error } =
     await supabase
       .from("monitored_websites")
       .insert({
-        url
+        url: urlValidation.url
       })
       .select()
       .single()

@@ -114,24 +114,38 @@ export default async function AuditDetailPage({
 
   const { id } = await params
 
-  const { data: audit } =
-    await supabase
+  const auditQuery =
+    supabase
       .from("audits")
-      .select("*")
+      .select(
+        "id,url,average_score,total_pages,total_issues,created_at"
+      )
       .eq("id", id)
       .single()
 
-  const currentAudit =
-    audit as AuditRow | null
-
-  const { data: pages } =
-    await supabase
+  const pagesQuery =
+    supabase
       .from("crawled_pages")
-      .select("*")
+      .select(
+        "id,audit_id,url,title,meta_description,h1s,h2s,seo_score,word_count,issues,ai_recommendations"
+      )
       .eq("audit_id", id)
       .order("seo_score", {
         ascending: false
       })
+      .limit(25)
+
+  const [
+    { data: audit },
+    { data: pages }
+  ] =
+    await Promise.all([
+      auditQuery,
+      pagesQuery
+    ])
+
+  const currentAudit =
+    audit as AuditRow | null
 
   let previousAudit: AuditRow | null = null
   let previousPages: CrawledPageRow[] = []
@@ -141,7 +155,9 @@ export default async function AuditDetailPage({
     const { data: previousAuditData } =
       await supabase
         .from("audits")
-        .select("*")
+        .select(
+          "id,url,average_score,total_pages,total_issues,created_at"
+        )
         .eq("url", currentAudit.url)
         .lt(
           "created_at",
@@ -161,11 +177,12 @@ export default async function AuditDetailPage({
       const { data: previousPagesData } =
         await supabase
           .from("crawled_pages")
-          .select("*")
+          .select("issues")
           .eq(
             "audit_id",
             previousAudit.id
           )
+          .limit(25)
 
       previousPages =
         (previousPagesData ||

@@ -1,49 +1,124 @@
 import { NextResponse } from "next/server"
 
-import { crawlWebsite } from "@/utils/crawler"
+import { enqueueAudit } from "@/utils/auditQueue"
+import {
+  checkRateLimit,
+  getRequestKey
+} from "@/utils/rateLimit"
+import { validateWebsiteUrl } from "@/utils/urlValidation"
 
 export async function POST(req: Request) {
 
   try {
-
-    const body = await req.json()
-
-    const { url } = body
-
-    if (!url) {
-
-      return NextResponse.json({
-        success: false,
-        error: "URL is required"
+    const rateLimit =
+      checkRateLimit({
+        key: getRequestKey(
+          req,
+          "analyze"
+        ),
+        limit: 6,
+        windowMs: 60_000
       })
 
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Too many audit requests. Please try again shortly.",
+          retryAfterSeconds:
+            rateLimit.retryAfterSeconds
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After":
+              String(
+                rateLimit.retryAfterSeconds
+              )
+          }
+        }
+      )
     }
 
-    const result =
-      await crawlWebsite(url)
+    let body: unknown
 
-    if (!result.success) {
+    try {
+      body = await req.json()
+    } catch {
       return NextResponse.json(
-        result,
+        {
+          success: false,
+          error:
+            "Request body must be valid JSON."
+        },
         {
           status: 400
         }
       )
     }
 
+    const urlValidation =
+      validateWebsiteUrl(
+        (body as { url?: unknown }).url
+      )
+
+    if (!urlValidation.success) {
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: urlValidation.error
+        },
+        {
+          status: 400
+        }
+      )
+
+    }
+
+    const result =
+      await enqueueAudit(
+        urlValidation.url
+      )
+
+    if (!result.success) {
+      const status =
+        result.status === "locked"
+          ? 409
+          : result.status === "queue_full"
+            ? 503
+            : result.status === "invalid"
+              ? 400
+              : 400
+
+      return NextResponse.json(
+        result,
+        {
+          status
+        }
+      )
+    }
+
     return NextResponse.json({
       success: true,
-      data: result
+      data: result.data,
+      queue: result.queue
     })
 
   } catch (error) {
 
     console.error(error)
 
-    return NextResponse.json({
-      success: false,
-      error: String(error)
-    })
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to analyze website."
+      },
+      {
+        status: 500
+      }
+    )
 
   }
 }

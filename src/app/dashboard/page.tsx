@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase"
 import { formatLocalTimestamp } from "@/lib/date"
 import DashboardCharts from "@/components/DashboardCharts"
 import MonitoredWebsites from "@/components/MonitoredWebsites"
+import { getAuditQueueSnapshot } from "@/utils/auditQueue"
 
 type Audit = {
   id: string
@@ -16,6 +17,20 @@ type Audit = {
   created_at: string
 }
 
+function getQueueMetrics() {
+  const queueSnapshot =
+    getAuditQueueSnapshot()
+
+  return {
+    queued:
+      queueSnapshot.queued,
+    running:
+      queueSnapshot.running,
+    failed:
+      queueSnapshot.failed
+  }
+}
+
 export default function DashboardPage() {
 
   const [audits, setAudits] =
@@ -24,9 +39,26 @@ export default function DashboardPage() {
   const [loading, setLoading] =
     useState(true)
 
+  const [queueMetrics, setQueueMetrics] =
+    useState(getQueueMetrics)
+
   useEffect(() => {
 
     loadAudits()
+
+  }, [])
+
+  useEffect(() => {
+
+    const interval =
+      window.setInterval(() => {
+        setQueueMetrics(
+          getQueueMetrics()
+        )
+      }, 2000)
+
+    return () =>
+      window.clearInterval(interval)
 
   }, [])
 
@@ -37,10 +69,13 @@ export default function DashboardPage() {
       const { data, error } =
         await supabase
           .from("audits")
-          .select("*")
+          .select(
+            "id,url,average_score,total_pages,total_issues,created_at"
+          )
           .order("created_at", {
             ascending: false
           })
+          .limit(100)
 
       if (error) {
 
@@ -144,7 +179,10 @@ export default function DashboardPage() {
 
         {audits.length > 0 && (
 
-          <DashboardCharts audits={audits} />
+          <DashboardCharts
+            audits={audits}
+            queueMetrics={queueMetrics}
+          />
 
         )}
 

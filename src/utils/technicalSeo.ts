@@ -1,3 +1,39 @@
+async function checkUrl(url: string) {
+  for (const method of ["HEAD", "GET"]) {
+    const controller =
+      new AbortController()
+
+    const timeout =
+      setTimeout(
+        () => controller.abort(),
+        5000
+      )
+
+    try {
+      const response =
+        await fetch(url, {
+          method,
+          redirect: "follow",
+          signal: controller.signal
+        })
+
+      if (
+        response.ok ||
+        response.status !== 405 ||
+        method === "GET"
+      ) {
+        return response.ok
+      }
+    } catch {
+      return false
+    } finally {
+      clearTimeout(timeout)
+    }
+  }
+
+  return false
+}
+
 export async function analyzeTechnicalSeo(
   html: string,
   baseUrl: string
@@ -22,25 +58,15 @@ export async function analyzeTechnicalSeo(
 
   try {
 
-    const robotsResponse =
-      await fetch(
-        `${origin}/robots.txt`
-      )
-
     technicalSeo.robotsTxt =
-      robotsResponse.ok
+      await checkUrl(`${origin}/robots.txt`)
 
   } catch {}
 
   try {
 
-    const sitemapResponse =
-      await fetch(
-        `${origin}/sitemap.xml`
-      )
-
     technicalSeo.sitemap =
-      sitemapResponse.ok
+      await checkUrl(`${origin}/sitemap.xml`)
 
   } catch {}
 

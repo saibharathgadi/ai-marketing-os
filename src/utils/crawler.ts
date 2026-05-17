@@ -2,6 +2,7 @@ import { analyzePage } from "./analyzer"
 import { analyzeTechnicalSeo } from "./technicalSeo"
 import { supabase } from "@/lib/supabase"
 import { generateAIRecommendations } from "./aiRecommendations"
+import { validateWebsiteUrl } from "./urlValidation"
 
 type TechnicalSeoResult = Awaited<
   ReturnType<typeof analyzeTechnicalSeo>
@@ -36,6 +37,46 @@ type AuditInsertResult = {
   id: string
 }
 
+const defaultMaxPages = 6
+const defaultPageConcurrency = 2
+const maxHtmlBytes = 3_000_000
+
+function getPositiveIntegerEnv(
+  key: string,
+  fallback: number
+) {
+  const parsed =
+    Number(process.env[key])
+
+  if (
+    Number.isInteger(parsed) &&
+    parsed > 0
+  ) {
+    return parsed
+  }
+
+  return fallback
+}
+
+function getCrawlConfig() {
+  const maxPages =
+    getPositiveIntegerEnv(
+      "CRAWL_MAX_PAGES",
+      defaultMaxPages
+    )
+
+  return {
+    maxPages,
+    maxInternalLinks:
+      Math.max(maxPages - 1, 0),
+    pageConcurrency:
+      getPositiveIntegerEnv(
+        "CRAWL_PAGE_CONCURRENCY",
+        defaultPageConcurrency
+      )
+  }
+}
+
 export function extractInternalLinks(
   links: string[],
   baseUrl: string
@@ -45,27 +86,40 @@ export function extractInternalLinks(
   const normalizedBase =
     normalizeUrlForComparison(base.href)
 
-  const internalLinks = links.filter((link) => {
+  const internalLinks: string[] = []
+  const seen = new Set<string>()
+
+  for (const link of links) {
 
     try {
 
       const candidate = new URL(link)
+      const normalizedCandidate =
+        normalizeUrlForComparison(
+          candidate.href
+        )
 
-      return (
+      if (
         candidate.hostname === base.hostname &&
-        normalizeUrlForComparison(candidate.href) !==
-          normalizedBase
-      )
+        normalizedCandidate !== normalizedBase &&
+        !seen.has(normalizedCandidate)
+      ) {
+        seen.add(normalizedCandidate)
+        internalLinks.push(normalizedCandidate)
+      }
 
     } catch {
 
-      return false
+      continue
 
     }
 
-  })
+  }
 
-  return [...new Set(internalLinks)].slice(0, 5)
+  return internalLinks.slice(
+    0,
+    getCrawlConfig().maxInternalLinks
+  )
 
 }
 
@@ -74,6 +128,7 @@ function normalizeUrlForComparison(url: string) {
   const parsed = new URL(url)
 
   parsed.hash = ""
+  parsed.search = ""
 
   if (
     parsed.pathname !== "/" &&
@@ -84,6 +139,81 @@ function normalizeUrlForComparison(url: string) {
 
   return parsed.href
 
+}
+
+async function readHtmlWithLimit(
+  response: Response,
+  maxBytes: number
+) {
+  if (!response.body) {
+    const text = await response.text()
+
+    return text.length > maxBytes
+      ? null
+      : text
+  }
+
+  const reader =
+    response.body.getReader()
+  const decoder =
+    new TextDecoder()
+  let receivedBytes = 0
+  let html = ""
+
+  while (true) {
+    const { done, value } =
+      await reader.read()
+
+    if (done) {
+      break
+    }
+
+    receivedBytes += value.byteLength
+
+    if (receivedBytes > maxBytes) {
+      await reader.cancel()
+      return null
+    }
+
+    html += decoder.decode(value, {
+      stream: true
+    })
+  }
+
+  html += decoder.decode()
+
+  return html
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  callback: (item: T) => Promise<R>
+) {
+  const results: R[] = []
+  let nextIndex = 0
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex
+      nextIndex += 1
+
+      results[currentIndex] =
+        await callback(items[currentIndex])
+    }
+  }
+
+  await Promise.all(
+    Array.from({
+      length:
+        Math.min(
+          concurrency,
+          items.length
+        )
+    }).map(() => worker())
+  )
+
+  return results
 }
 
 function decodeHtml(value: string) {
@@ -190,7 +320,38 @@ async function loadPage(
       return null
     }
 
-    const html = await response.text()
+    const contentType =
+      response.headers.get("content-type") || ""
+
+    if (
+      contentType &&
+      !contentType.toLowerCase().includes("text/html")
+    ) {
+      return null
+    }
+
+    const contentLength =
+      Number(
+        response.headers.get("content-length")
+      )
+
+    if (
+      Number.isFinite(contentLength) &&
+      contentLength > maxHtmlBytes
+    ) {
+      return null
+    }
+
+    const html =
+      await readHtmlWithLimit(
+        response,
+        maxHtmlBytes
+      )
+
+    if (!html) {
+      return null
+    }
+
     const finalUrl = response.url || url
 
     return {
@@ -335,8 +496,21 @@ async function persistCrawledPages(
 
 export async function crawlWebsite(url: string) {
 
+  const urlValidation =
+    validateWebsiteUrl(url)
+
+  if (!urlValidation.success) {
+    return {
+      success: false,
+      error: urlValidation.error
+    }
+  }
+
+  const crawlConfig =
+    getCrawlConfig()
+
   const homepage =
-    await loadPage(url)
+    await loadPage(urlValidation.url)
 
   if (!homepage) {
 
@@ -392,64 +566,84 @@ export async function crawlWebsite(url: string) {
       homepage.finalUrl
     )
 
-  for (const link of internalLinks) {
+  const crawlableLinks =
+    internalLinks.slice(
+      0,
+      Math.max(crawlConfig.maxPages - 1, 0)
+    )
 
-    try {
+  const subPages =
+    await mapWithConcurrency(
+      crawlableLinks,
+      crawlConfig.pageConcurrency,
+      async (link) => {
 
-      console.log(
-        "Crawling:",
-        link
-      )
+        try {
 
-      const subPage =
-        await loadPage(link)
+          console.log(
+            "Crawling:",
+            link
+          )
 
-      if (!subPage) {
+          const subPage =
+            await loadPage(link)
 
-        console.log(
-          "Skipping slow page:",
-          link
-        )
+          if (!subPage) {
 
-        continue
+            console.log(
+              "Skipping slow page:",
+              link
+            )
+
+            return null
+
+          }
+
+          const analysis =
+            analyzePage({
+              title: subPage.title,
+              metaDescription:
+                subPage.metaDescription,
+              h1s: subPage.h1s,
+              h2s: subPage.h2s,
+              h3s: subPage.h3s,
+              text: subPage.text,
+              totalLinks:
+                subPage.links.length
+            })
+
+          const aiRecommendations =
+            await generateAIRecommendations(
+              analysis
+            )
+
+          return {
+            url: subPage.finalUrl || link,
+            ...analysis,
+            aiRecommendations
+          }
+
+        } catch (error) {
+
+          console.error(
+            "Error crawling page:",
+            link,
+            error
+          )
+
+          return null
+
+        }
 
       }
+    )
 
-      const analysis =
-        analyzePage({
-          title: subPage.title,
-          metaDescription:
-            subPage.metaDescription,
-          h1s: subPage.h1s,
-          h2s: subPage.h2s,
-          h3s: subPage.h3s,
-          text: subPage.text,
-          totalLinks:
-            subPage.links.length
-        })
-
-      const aiRecommendations =
-        await generateAIRecommendations(
-          analysis
-        )
-
-      crawledPages.push({
-        url: subPage.finalUrl || link,
-        ...analysis,
-        aiRecommendations
-      })
-
-    } catch (error) {
-
-      console.error(
-        "Error crawling page:",
-        link,
-        error
-      )
-
-    }
-
-  }
+  crawledPages.push(
+    ...subPages.filter(
+      (page): page is CrawledPage =>
+        Boolean(page)
+    )
+  )
 
   const averageSeoScore =
     Math.round(
@@ -504,7 +698,7 @@ export async function crawlWebsite(url: string) {
 
     const auditData =
       await createAuditRecord({
-        url,
+        url: urlValidation.url,
         average_score:
           averageSeoScore,
         total_pages:

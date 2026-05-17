@@ -36,11 +36,14 @@ export async function GET(
   const { data: pages, error: pagesError } =
     await supabase
       .from("crawled_pages")
-      .select("*")
+      .select(
+        "id,audit_id,url,title,meta_description,h1s,h2s,seo_score,word_count,issues,ai_recommendations"
+      )
       .eq("audit_id", id)
       .order("seo_score", {
         ascending: false
       })
+      .limit(25)
 
   if (pagesError) {
 
