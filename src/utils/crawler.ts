@@ -20,6 +20,24 @@ type PageSnapshot = {
   links: string[]
 }
 
+export type CrawlFailureReason =
+  | "timeout"
+  | "blocked"
+  | "non-html"
+  | "queue_rejection"
+  | "invalid_url"
+  | "unknown"
+
+type LoadPageResult =
+  | {
+      success: true
+      page: PageSnapshot
+    }
+  | {
+      success: false
+      reason: CrawlFailureReason
+    }
+
 type CrawledPage = ReturnType<typeof analyzePage> & {
   url: string
   aiRecommendations: string
@@ -31,6 +49,10 @@ type AuditInsertPayload = {
   total_pages: number
   total_issues: number
   technical_seo?: TechnicalSeoResult
+  crawl_duration_ms?: number
+  crawl_status?: "completed" | "failed"
+  crawl_failure_reason?: CrawlFailureReason | null
+  is_slow?: boolean
 }
 
 type AuditInsertResult = {
@@ -40,6 +62,7 @@ type AuditInsertResult = {
 const defaultMaxPages = 6
 const defaultPageConcurrency = 2
 const maxHtmlBytes = 3_000_000
+const defaultSlowCrawlMs = 10_000
 
 function getPositiveIntegerEnv(
   key: string,
@@ -73,6 +96,11 @@ function getCrawlConfig() {
       getPositiveIntegerEnv(
         "CRAWL_PAGE_CONCURRENCY",
         defaultPageConcurrency
+      ),
+    slowCrawlMs:
+      getPositiveIntegerEnv(
+        "CRAWL_SLOW_MS",
+        defaultSlowCrawlMs
       )
   }
 }
@@ -297,7 +325,7 @@ function extractLinks(
 
 async function loadPage(
   url: string
-): Promise<PageSnapshot | null> {
+): Promise<LoadPageResult> {
 
   const controller = new AbortController()
   const timeout = setTimeout(
@@ -317,7 +345,10 @@ async function loadPage(
     })
 
     if (!response.ok) {
-      return null
+      return {
+        success: false,
+        reason: "blocked"
+      }
     }
 
     const contentType =
@@ -327,7 +358,10 @@ async function loadPage(
       contentType &&
       !contentType.toLowerCase().includes("text/html")
     ) {
-      return null
+      return {
+        success: false,
+        reason: "non-html"
+      }
     }
 
     const contentLength =
@@ -339,7 +373,10 @@ async function loadPage(
       Number.isFinite(contentLength) &&
       contentLength > maxHtmlBytes
     ) {
-      return null
+      return {
+        success: false,
+        reason: "non-html"
+      }
     }
 
     const html =
@@ -349,38 +386,51 @@ async function loadPage(
       )
 
     if (!html) {
-      return null
+      return {
+        success: false,
+        reason: "non-html"
+      }
     }
 
     const finalUrl = response.url || url
 
     return {
-      finalUrl,
-      html,
-      title:
-        extractFirst(
-          html,
-          /<title\b[^>]*>([\s\S]*?)<\/title>/i
-        ) || "",
-      metaDescription:
-        extractFirst(
-          html,
-          /<meta\b[^>]*name=["']description["'][^>]*content=["']([^"']*)["'][^>]*>/i
-        ) ||
-        extractFirst(
-          html,
-          /<meta\b[^>]*content=["']([^"']*)["'][^>]*name=["']description["'][^>]*>/i
-        ),
-      h1s: extractHeadings(html, "h1"),
-      h2s: extractHeadings(html, "h2"),
-      h3s: extractHeadings(html, "h3"),
-      text: stripTags(html),
-      links: extractLinks(html, finalUrl)
+      success: true,
+      page: {
+        finalUrl,
+        html,
+        title:
+          extractFirst(
+            html,
+            /<title\b[^>]*>([\s\S]*?)<\/title>/i
+          ) || "",
+        metaDescription:
+          extractFirst(
+            html,
+            /<meta\b[^>]*name=["']description["'][^>]*content=["']([^"']*)["'][^>]*>/i
+          ) ||
+          extractFirst(
+            html,
+            /<meta\b[^>]*content=["']([^"']*)["'][^>]*name=["']description["'][^>]*>/i
+          ),
+        h1s: extractHeadings(html, "h1"),
+        h2s: extractHeadings(html, "h2"),
+        h3s: extractHeadings(html, "h3"),
+        text: stripTags(html),
+        links: extractLinks(html, finalUrl)
+      }
     }
 
-  } catch {
+  } catch (error) {
 
-    return null
+    return {
+      success: false,
+      reason:
+        error instanceof DOMException &&
+        error.name === "AbortError"
+          ? "timeout"
+          : "unknown"
+    }
 
   } finally {
 
@@ -410,6 +460,10 @@ async function createAuditRecord(
 
   const missingTechnicalSeoColumn =
     message.includes("technical_seo") ||
+    message.includes("crawl_duration_ms") ||
+    message.includes("crawl_status") ||
+    message.includes("crawl_failure_reason") ||
+    message.includes("is_slow") ||
     message.includes("schema cache")
 
   if (!missingTechnicalSeoColumn) {
@@ -419,7 +473,7 @@ async function createAuditRecord(
   }
 
   console.warn(
-    "technical_seo column is missing on audits; continuing without persisted technical SEO."
+    "One or more optional audit diagnostic columns are missing; continuing with the base audit schema."
   )
 
   const fallbackPayload = {
@@ -496,36 +550,60 @@ async function persistCrawledPages(
 
 export async function crawlWebsite(url: string) {
 
+  const startedAt = Date.now()
   const urlValidation =
     validateWebsiteUrl(url)
+  const getDurationMs = () =>
+    Date.now() - startedAt
 
   if (!urlValidation.success) {
     return {
       success: false,
-      error: urlValidation.error
+      error: urlValidation.error,
+      failureReason:
+        "invalid_url" as CrawlFailureReason,
+      durationMs: getDurationMs(),
+      isSlow: false
     }
   }
 
   const crawlConfig =
     getCrawlConfig()
 
-  const homepage =
+  const homepageResult =
     await loadPage(urlValidation.url)
 
-  if (!homepage) {
+  if (!homepageResult.success) {
 
     console.error(
       "Homepage failed completely:",
       url
     )
 
+    const durationMs =
+      getDurationMs()
+
     return {
       success: false,
+      failureReason:
+        homepageResult.reason,
+      durationMs,
+      isSlow:
+        durationMs >= crawlConfig.slowCrawlMs,
       error:
-        "Unable to access website. The website may be blocking crawlers or responding too slowly."
+        homepageResult.reason === "timeout"
+          ? "The website took too long to respond."
+          : homepageResult.reason === "non-html"
+            ? "The URL did not return an HTML page."
+            : homepageResult.reason === "blocked"
+              ? "The website blocked the crawl request."
+              : "Unable to access website. The website may be blocking crawlers or responding too slowly."
     }
 
   }
+
+  const homepage =
+    homepageResult.page
 
   const homepageAnalysis =
     analyzePage({
@@ -588,7 +666,7 @@ export async function crawlWebsite(url: string) {
           const subPage =
             await loadPage(link)
 
-          if (!subPage) {
+          if (!subPage.success) {
 
             console.log(
               "Skipping slow page:",
@@ -601,15 +679,15 @@ export async function crawlWebsite(url: string) {
 
           const analysis =
             analyzePage({
-              title: subPage.title,
+              title: subPage.page.title,
               metaDescription:
-                subPage.metaDescription,
-              h1s: subPage.h1s,
-              h2s: subPage.h2s,
-              h3s: subPage.h3s,
-              text: subPage.text,
+                subPage.page.metaDescription,
+              h1s: subPage.page.h1s,
+              h2s: subPage.page.h2s,
+              h3s: subPage.page.h3s,
+              text: subPage.page.text,
               totalLinks:
-                subPage.links.length
+                subPage.page.links.length
             })
 
           const aiRecommendations =
@@ -618,7 +696,7 @@ export async function crawlWebsite(url: string) {
             )
 
           return {
-            url: subPage.finalUrl || link,
+            url: subPage.page.finalUrl || link,
             ...analysis,
             aiRecommendations
           }
@@ -695,6 +773,10 @@ export async function crawlWebsite(url: string) {
   }
 
   try {
+    const durationMs =
+      getDurationMs()
+    const isSlow =
+      durationMs >= crawlConfig.slowCrawlMs
 
     const auditData =
       await createAuditRecord({
@@ -706,7 +788,15 @@ export async function crawlWebsite(url: string) {
         total_issues:
           totalIssues,
         technical_seo:
-          technicalSeo
+          technicalSeo,
+        crawl_duration_ms:
+          durationMs,
+        crawl_status:
+          "completed",
+        crawl_failure_reason:
+          null,
+        is_slow:
+          isSlow
       })
 
     await persistCrawledPages(
@@ -718,8 +808,16 @@ export async function crawlWebsite(url: string) {
 
     console.error(error)
 
+    const durationMs =
+      getDurationMs()
+
     return {
       success: false,
+      failureReason:
+        "unknown" as CrawlFailureReason,
+      durationMs,
+      isSlow:
+        durationMs >= crawlConfig.slowCrawlMs,
       error:
         error instanceof Error
           ? error.message
@@ -731,6 +829,12 @@ export async function crawlWebsite(url: string) {
   return {
 
     success: true,
+    durationMs:
+      getDurationMs(),
+    isSlow:
+      getDurationMs() >= crawlConfig.slowCrawlMs,
+    failureReason:
+      null,
 
     homepageAnalysis,
 

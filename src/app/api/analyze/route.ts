@@ -5,6 +5,7 @@ import {
   checkRateLimit,
   getRequestKey
 } from "@/utils/rateLimit"
+import { updateMonitoredWebsiteDiagnostics } from "@/utils/monitoredWebsiteDiagnostics"
 import { validateWebsiteUrl } from "@/utils/urlValidation"
 
 export async function POST(req: Request) {
@@ -81,6 +82,23 @@ export async function POST(req: Request) {
       await enqueueAudit(
         urlValidation.url
       )
+
+    await updateMonitoredWebsiteDiagnostics({
+      url: urlValidation.url,
+      success: result.success,
+      failureReason:
+        result.success
+          ? result.data.failureReason
+          : result.failureReason,
+      durationMs:
+        result.success
+          ? result.data.durationMs
+          : result.durationMs,
+      isSlow:
+        result.success
+          ? result.data.isSlow
+          : false
+    })
 
     if (!result.success) {
       const status =

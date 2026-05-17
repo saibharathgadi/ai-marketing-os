@@ -7,6 +7,27 @@ type Website = {
   id: string
   url: string
   last_audited_at?: string
+  last_failure_reason?: string | null
+  last_audit_duration_ms?: number | null
+  last_audit_status?: string | null
+  last_audit_is_slow?: boolean | null
+}
+
+function formatDuration(
+  durationMs: number | null | undefined
+) {
+  if (
+    typeof durationMs !== "number" ||
+    Number.isNaN(durationMs)
+  ) {
+    return "No duration yet"
+  }
+
+  if (durationMs < 1000) {
+    return `${durationMs}ms`
+  }
+
+  return `${(durationMs / 1000).toFixed(1)}s`
 }
 
 export default function MonitoredWebsites({
@@ -410,6 +431,34 @@ export default function MonitoredWebsites({
                   )}
 
                 </p>
+
+                <div className="mt-3 flex flex-wrap gap-2 text-xs">
+
+                  <span className="rounded-lg bg-zinc-900 px-3 py-2 text-zinc-400">
+                    Duration:{" "}
+                    {formatDuration(
+                      website.last_audit_duration_ms
+                    )}
+                  </span>
+
+                  {website.last_audit_is_slow && (
+
+                    <span className="rounded-lg bg-orange-500/10 px-3 py-2 text-orange-300">
+                      Slow website
+                    </span>
+
+                  )}
+
+                  {website.last_failure_reason && (
+
+                    <span className="rounded-lg bg-red-500/10 px-3 py-2 text-red-300">
+                      Last failure:{" "}
+                      {website.last_failure_reason}
+                    </span>
+
+                  )}
+
+                </div>
 
               </div>
 

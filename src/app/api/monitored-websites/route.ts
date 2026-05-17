@@ -2,22 +2,82 @@ import { NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase"
 import { validateWebsiteUrl } from "@/utils/urlValidation"
 
+const monitoredWebsiteSelect =
+  "id,url,last_audited_at,last_failure_reason,last_audit_duration_ms,last_audit_status,last_audit_is_slow,created_at"
+
+const fallbackMonitoredWebsiteSelect =
+  "id,url,last_audited_at,created_at"
+
+function isMissingDiagnosticsColumn(
+  message: string
+) {
+  const normalized =
+    message.toLowerCase()
+
+  return (
+    normalized.includes(
+      "last_failure_reason"
+    ) ||
+    normalized.includes(
+      "last_audit_duration_ms"
+    ) ||
+    normalized.includes(
+      "last_audit_status"
+    ) ||
+    normalized.includes(
+      "last_audit_is_slow"
+    ) ||
+    normalized.includes("schema cache")
+  )
+}
+
 export async function GET() {
 
-  const { data, error } =
+  const response =
     await supabase
       .from("monitored_websites")
-      .select("id,url,last_audited_at,created_at")
+      .select(monitoredWebsiteSelect)
       .order("created_at", {
         ascending: false
       })
 
-  if (error) {
+  if (
+    response.error &&
+    isMissingDiagnosticsColumn(
+      response.error.message
+    )
+  ) {
+    const fallback =
+      await supabase
+        .from("monitored_websites")
+        .select(fallbackMonitoredWebsiteSelect)
+        .order("created_at", {
+          ascending: false
+        })
+
+    if (!fallback.error) {
+      return NextResponse.json({
+        success: true,
+        data:
+          (fallback.data || []).map(
+            (website) => ({
+              ...website,
+              last_failure_reason: null,
+              last_audit_duration_ms: null,
+              last_audit_status: null,
+              last_audit_is_slow: false
+            })
+          )
+      })
+    }
+  }
+
+  if (response.error) {
 
     return NextResponse.json(
       {
         success: false,
-        error: error.message
+        error: response.error.message
       },
       {
         status: 500
@@ -28,7 +88,7 @@ export async function GET() {
 
   return NextResponse.json({
     success: true,
-    data
+    data: response.data
   })
 
 }
@@ -71,21 +131,37 @@ export async function POST(
     )
   }
 
-  const { data, error } =
+  let insertResponse =
     await supabase
       .from("monitored_websites")
       .insert({
         url: urlValidation.url
       })
-      .select()
+      .select(monitoredWebsiteSelect)
       .single()
 
-  if (error) {
+  if (
+    insertResponse.error &&
+    isMissingDiagnosticsColumn(
+      insertResponse.error.message
+    )
+  ) {
+    insertResponse =
+      await supabase
+        .from("monitored_websites")
+        .insert({
+          url: urlValidation.url
+        })
+        .select(fallbackMonitoredWebsiteSelect)
+        .single()
+  }
+
+  if (insertResponse.error) {
 
     return NextResponse.json(
       {
         success: false,
-        error: error.message
+        error: insertResponse.error.message
       },
       {
         status: 500
@@ -96,7 +172,33 @@ export async function POST(
 
   return NextResponse.json({
     success: true,
-    data
+    data: {
+      ...insertResponse.data,
+      last_failure_reason:
+        "last_failure_reason" in
+        insertResponse.data
+          ? insertResponse.data
+              .last_failure_reason
+          : null,
+      last_audit_duration_ms:
+        "last_audit_duration_ms" in
+        insertResponse.data
+          ? insertResponse.data
+              .last_audit_duration_ms
+          : null,
+      last_audit_status:
+        "last_audit_status" in
+        insertResponse.data
+          ? insertResponse.data
+              .last_audit_status
+          : null,
+      last_audit_is_slow:
+        "last_audit_is_slow" in
+        insertResponse.data
+          ? insertResponse.data
+              .last_audit_is_slow
+          : false
+    }
   })
 
 }

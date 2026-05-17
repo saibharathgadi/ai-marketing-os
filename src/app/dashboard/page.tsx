@@ -6,7 +6,6 @@ import { supabase } from "@/lib/supabase"
 import { formatLocalTimestamp } from "@/lib/date"
 import DashboardCharts from "@/components/DashboardCharts"
 import MonitoredWebsites from "@/components/MonitoredWebsites"
-import { getAuditQueueSnapshot } from "@/utils/auditQueue"
 
 type Audit = {
   id: string
@@ -15,20 +14,49 @@ type Audit = {
   total_pages: number
   total_issues: number
   created_at: string
+  crawl_duration_ms?: number | null
+  crawl_failure_reason?: string | null
+  crawl_status?: string | null
+  is_slow?: boolean | null
 }
 
-function getQueueMetrics() {
-  const queueSnapshot =
-    getAuditQueueSnapshot()
+type QueueMetrics = {
+  queued: number
+  running: number
+  failed: number
+  failedByReason?: Record<string, number>
+}
 
-  return {
-    queued:
-      queueSnapshot.queued,
-    running:
-      queueSnapshot.running,
-    failed:
-      queueSnapshot.failed
-  }
+const defaultQueueMetrics: QueueMetrics = {
+  queued: 0,
+  running: 0,
+  failed: 0,
+  failedByReason: {}
+}
+
+const auditSelect =
+  "id,url,average_score,total_pages,total_issues,created_at,crawl_duration_ms,crawl_failure_reason,crawl_status,is_slow"
+
+const fallbackAuditSelect =
+  "id,url,average_score,total_pages,total_issues,created_at"
+
+function isMissingDiagnosticsColumn(
+  message: string
+) {
+  const normalized =
+    message.toLowerCase()
+
+  return (
+    normalized.includes(
+      "crawl_duration_ms"
+    ) ||
+    normalized.includes(
+      "crawl_failure_reason"
+    ) ||
+    normalized.includes("crawl_status") ||
+    normalized.includes("is_slow") ||
+    normalized.includes("schema cache")
+  )
 }
 
 export default function DashboardPage() {
@@ -40,7 +68,7 @@ export default function DashboardPage() {
     useState(true)
 
   const [queueMetrics, setQueueMetrics] =
-    useState(getQueueMetrics)
+    useState(defaultQueueMetrics)
 
   useEffect(() => {
 
@@ -52,40 +80,110 @@ export default function DashboardPage() {
 
     const interval =
       window.setInterval(() => {
-        setQueueMetrics(
-          getQueueMetrics()
-        )
+        loadDiagnostics()
       }, 2000)
+
+    loadDiagnostics()
 
     return () =>
       window.clearInterval(interval)
 
   }, [])
 
+  async function loadDiagnostics() {
+    try {
+      const response =
+        await fetch("/api/diagnostics")
+      const result =
+        await response.json()
+
+      if (result.success) {
+        setQueueMetrics({
+          queued:
+            result.queue?.queued || 0,
+          running:
+            result.queue?.running || 0,
+          failed:
+            result.queue?.failed || 0,
+          failedByReason:
+            result.queue?.failedByReason || {}
+        })
+      }
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
   async function loadAudits() {
 
     try {
 
-      const { data, error } =
+      let response =
         await supabase
           .from("audits")
-          .select(
-            "id,url,average_score,total_pages,total_issues,created_at"
-          )
+          .select(auditSelect)
           .order("created_at", {
             ascending: false
           })
           .limit(100)
+          .then((result) => result as {
+            data: Audit[] | null
+            error: { message: string } | null
+          })
 
-      if (error) {
+      if (
+        response.error &&
+        isMissingDiagnosticsColumn(
+          response.error.message
+        )
+      ) {
+        response =
+          await supabase
+            .from("audits")
+            .select(fallbackAuditSelect)
+            .order("created_at", {
+              ascending: false
+            })
+            .limit(100)
+            .then((result) => result as {
+              data: Audit[] | null
+              error: {
+                message: string
+              } | null
+            })
+      }
 
-        console.error(error)
+      if (response.error) {
+
+        console.error(response.error)
 
         return
 
       }
 
-      setAudits(data || [])
+      setAudits(
+        (response.data || []).map(
+          (audit) => ({
+            ...audit,
+            crawl_duration_ms:
+              "crawl_duration_ms" in audit
+                ? audit.crawl_duration_ms
+                : null,
+            crawl_failure_reason:
+              "crawl_failure_reason" in audit
+                ? audit.crawl_failure_reason
+                : null,
+            crawl_status:
+              "crawl_status" in audit
+                ? audit.crawl_status
+                : null,
+            is_slow:
+              "is_slow" in audit
+                ? audit.is_slow
+                : false
+          })
+        )
+      )
 
     } catch (error) {
 
@@ -177,14 +275,10 @@ export default function DashboardPage() {
 
         </div>
 
-        {audits.length > 0 && (
-
-          <DashboardCharts
-            audits={audits}
-            queueMetrics={queueMetrics}
-          />
-
-        )}
+        <DashboardCharts
+          audits={audits}
+          queueMetrics={queueMetrics}
+        />
 
         <MonitoredWebsites
           onAuditCompleted={loadAudits}

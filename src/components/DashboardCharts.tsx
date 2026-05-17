@@ -23,6 +23,10 @@ type Audit = {
   total_issues: number
   total_pages: number
   created_at: string
+  crawl_duration_ms?: number | null
+  crawl_failure_reason?: string | null
+  crawl_status?: string | null
+  is_slow?: boolean | null
 }
 
 type TrendPoint = {
@@ -38,6 +42,7 @@ type QueueMetrics = {
   queued: number
   running: number
   failed: number
+  failedByReason?: Record<string, number>
 }
 
 const axisColor = "#71717a"
@@ -102,6 +107,59 @@ function formatDelta(
   const sign = value > 0 ? "+" : ""
 
   return `${sign}${value}${suffix}`
+}
+
+function formatDuration(
+  durationMs: number | null | undefined
+) {
+  if (
+    typeof durationMs !== "number" ||
+    Number.isNaN(durationMs)
+  ) {
+    return "No data"
+  }
+
+  if (durationMs < 1000) {
+    return `${durationMs}ms`
+  }
+
+  return `${(durationMs / 1000).toFixed(1)}s`
+}
+
+function getLatestFailure(
+  audits: Audit[]
+) {
+  return audits.find(
+    (audit) =>
+      audit.crawl_status === "failed" ||
+      Boolean(audit.crawl_failure_reason)
+  )
+}
+
+function getAverageDurationMs(
+  audits: Audit[]
+) {
+  const durations =
+    audits
+      .map((audit) => audit.crawl_duration_ms)
+      .filter(
+        (
+          duration
+        ): duration is number =>
+          typeof duration === "number"
+      )
+
+  if (durations.length === 0) {
+    return null
+  }
+
+  return Math.round(
+    durations.reduce(
+      (sum, duration) =>
+        sum + duration,
+      0
+    ) / durations.length
+  )
 }
 
 function getStatusClasses(
@@ -332,7 +390,8 @@ export default function DashboardCharts({
   queueMetrics = {
     queued: 0,
     running: 0,
-    failed: 0
+    failed: 0,
+    failedByReason: {}
   }
 }: {
   audits: Audit[]
@@ -359,6 +418,18 @@ export default function DashboardCharts({
         latestAudit,
       previousAudit
     })
+  const averageDurationMs =
+    getAverageDurationMs(audits)
+  const slowAuditCount =
+    audits.filter(
+      (audit) => audit.is_slow
+    ).length
+  const latestFailure =
+    getLatestFailure(audits)
+  const mostCommonQueueFailure =
+    Object.entries(
+      queueMetrics.failedByReason || {}
+    ).sort((a, b) => b[1] - a[1])[0]
 
   return (
 
@@ -454,16 +525,16 @@ export default function DashboardCharts({
         <div className="flex items-center justify-between gap-4 flex-wrap">
 
           <h3 className="text-2xl font-semibold">
-            Crawl Queue
+            Crawl Diagnostics
           </h3>
 
           <p className="text-zinc-500 text-sm">
-            Current in-memory audit queue activity.
+            Runtime health, duration, and failure signals.
           </p>
 
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mt-4">
 
           <QueueMetricCard
             label="Running"
@@ -481,6 +552,31 @@ export default function DashboardCharts({
             label="Failed"
             value={queueMetrics.failed}
             detail="Failed queue jobs in this warm instance"
+          />
+
+          <TrendSummaryCard
+            label="Avg Crawl Time"
+            value={formatDuration(
+              averageDurationMs
+            )}
+            detail="Across loaded audit history"
+          />
+
+          <TrendSummaryCard
+            label="Slow Websites"
+            value={String(slowAuditCount)}
+            detail="Audits above the slow crawl threshold"
+          />
+
+          <TrendSummaryCard
+            label="Last Failure"
+            value={
+              latestFailure
+                ?.crawl_failure_reason ||
+              mostCommonQueueFailure?.[0] ||
+              "None"
+            }
+            detail="Most recent persisted or queue failure"
           />
 
         </div>
@@ -518,30 +614,34 @@ export default function DashboardCharts({
 
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mt-6">
+      {trendData.length > 0 && (
 
-        <ChartPanel
-          title="SEO Score Trend"
-          dataKey="score"
-          color={scoreColor}
-          data={trendData}
-        />
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mt-6">
 
-        <ChartPanel
-          title="Total Issues Trend"
-          dataKey="issues"
-          color={issuesColor}
-          data={trendData}
-        />
+          <ChartPanel
+            title="SEO Score Trend"
+            dataKey="score"
+            color={scoreColor}
+            data={trendData}
+          />
 
-        <ChartPanel
-          title="Pages Crawled Trend"
-          dataKey="pages"
-          color={pagesColor}
-          data={trendData}
-        />
+          <ChartPanel
+            title="Total Issues Trend"
+            dataKey="issues"
+            color={issuesColor}
+            data={trendData}
+          />
 
-      </div>
+          <ChartPanel
+            title="Pages Crawled Trend"
+            dataKey="pages"
+            color={pagesColor}
+            data={trendData}
+          />
+
+        </div>
+
+      )}
 
     </section>
 

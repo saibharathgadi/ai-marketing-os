@@ -1,4 +1,7 @@
-import { crawlWebsite } from "./crawler"
+import {
+  CrawlFailureReason,
+  crawlWebsite
+} from "./crawler"
 import { validateWebsiteUrl } from "./urlValidation"
 
 type AuditQueueJob = {
@@ -28,6 +31,8 @@ export type QueuedAuditResult =
         | "queue_full"
         | "failed"
       error: string
+      failureReason: CrawlFailureReason
+      durationMs: number
       queue: AuditQueueSnapshot
     }
 
@@ -36,6 +41,8 @@ export type AuditQueueSnapshot = {
   running: number
   queued: number
   failed: number
+  failedByReason:
+    Partial<Record<CrawlFailureReason, number>>
   maxActive: number
   maxQueued: number
   activeUrls: string[]
@@ -44,6 +51,8 @@ export type AuditQueueSnapshot = {
 type AuditQueueState = {
   activeCount: number
   failedCount: number
+  failedByReason:
+    Partial<Record<CrawlFailureReason, number>>
   queue: AuditQueueJob[]
   activeUrls: Set<string>
 }
@@ -60,11 +69,15 @@ const state =
   globalForAuditQueue[stateKey] || {
     activeCount: 0,
     failedCount: 0,
+    failedByReason: {},
     queue: [],
     activeUrls: new Set<string>()
   }
 
 globalForAuditQueue[stateKey] = state
+
+state.failedByReason =
+  state.failedByReason || {}
 
 function getPositiveIntegerEnv(
   key: string,
@@ -108,6 +121,8 @@ export function getAuditQueueSnapshot():
     running: state.activeCount,
     queued: state.queue.length,
     failed: state.failedCount,
+    failedByReason:
+      state.failedByReason,
     maxActive: config.maxActive,
     maxQueued: config.maxQueued,
     activeUrls:
@@ -121,6 +136,12 @@ function completeJob(
 ) {
   if (!result.success) {
     state.failedCount += 1
+    state.failedByReason[
+      result.failureReason
+    ] =
+      (state.failedByReason[
+        result.failureReason
+      ] || 0) + 1
   }
 
   state.activeCount =
@@ -144,6 +165,11 @@ async function runJob(job: AuditQueueJob) {
         error:
           result.error ||
           "Audit failed.",
+        failureReason:
+          result.failureReason ||
+          "unknown",
+        durationMs:
+          result.durationMs,
         queue:
           getAuditQueueSnapshot()
       })
@@ -168,6 +194,10 @@ async function runJob(job: AuditQueueJob) {
         error instanceof Error
           ? error.message
           : "Audit failed.",
+      failureReason: "unknown",
+      durationMs:
+        Date.now() -
+        (job.startedAt || Date.now()),
       queue:
         getAuditQueueSnapshot()
     })
@@ -205,6 +235,8 @@ export async function enqueueAudit(
       success: false,
       status: "invalid",
       error: urlValidation.error,
+      failureReason: "invalid_url",
+      durationMs: 0,
       queue:
         getAuditQueueSnapshot()
     }
@@ -219,6 +251,8 @@ export async function enqueueAudit(
       status: "locked",
       error:
         "An audit is already running for this URL. Please wait for it to finish.",
+      failureReason: "queue_rejection",
+      durationMs: 0,
       queue:
         getAuditQueueSnapshot()
     }
@@ -233,6 +267,8 @@ export async function enqueueAudit(
       status: "queue_full",
       error:
         "The audit queue is currently full. Please try again shortly.",
+      failureReason: "queue_rejection",
+      durationMs: 0,
       queue:
         getAuditQueueSnapshot()
     }

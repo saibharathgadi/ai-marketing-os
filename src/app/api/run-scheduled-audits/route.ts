@@ -5,6 +5,7 @@ import {
   checkRateLimit,
   getRequestKey
 } from "@/utils/rateLimit"
+import { updateMonitoredWebsiteDiagnostics } from "@/utils/monitoredWebsiteDiagnostics"
 
 function isAuthorizedRequest(request: Request) {
   const cronSecret =
@@ -108,15 +109,23 @@ export async function GET(request: Request) {
             website.url
           )
 
-        if (auditResult.success) {
-          await supabase
-            .from("monitored_websites")
-            .update({
-              last_audited_at:
-                new Date().toISOString()
-            })
-            .eq("id", website.id)
-        }
+        await updateMonitoredWebsiteDiagnostics({
+          id: website.id,
+          url: website.url,
+          success: auditResult.success,
+          failureReason:
+            auditResult.success
+              ? auditResult.data.failureReason
+              : auditResult.failureReason,
+          durationMs:
+            auditResult.success
+              ? auditResult.data.durationMs
+              : auditResult.durationMs,
+          isSlow:
+            auditResult.success
+              ? auditResult.data.isSlow
+              : false
+        })
 
         results.push({
 
@@ -131,7 +140,22 @@ export async function GET(request: Request) {
           error:
             auditResult.success
               ? undefined
-              : auditResult.error
+              : auditResult.error,
+
+          failureReason:
+            auditResult.success
+              ? auditResult.data.failureReason
+              : auditResult.failureReason,
+
+          durationMs:
+            auditResult.success
+              ? auditResult.data.durationMs
+              : auditResult.durationMs,
+
+          isSlow:
+            auditResult.success
+              ? auditResult.data.isSlow
+              : false
 
         })
 
