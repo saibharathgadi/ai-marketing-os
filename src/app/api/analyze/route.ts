@@ -229,7 +229,15 @@ export async function POST(req: Request) {
             process.env
               .SUPABASE_SERVICE_ROLE_KEY!
           )
+            console.log(
+  "Saving AI insights for audit:",
+  auditData.auditId
+)
 
+console.log(
+  "AI insights payload:",
+  aiInsights
+)
         await supabase
           .from("audits")
           .update({
