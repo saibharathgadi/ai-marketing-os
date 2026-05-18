@@ -1,5 +1,5 @@
+import { generateAIInsights } from "@/utils/aiCopilot"
 import { NextResponse } from "next/server"
-
 import { enqueueAudit } from "@/utils/auditQueue"
 import {
   checkRateLimit,
