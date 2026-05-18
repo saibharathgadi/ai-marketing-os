@@ -109,7 +109,96 @@ export async function POST(req: Request) {
             : result.status === "invalid"
               ? 400
               : 400
+        // ======================================================
+// AI INSIGHT GENERATION
+// ======================================================
 
+try {
+
+  const auditData = result.data
+
+  const aiInsights =
+    await generateAIInsights({
+      seoScore:
+        auditData.seoScore ?? 0,
+
+      healthStatus:
+        auditData.healthStatus ??
+        "Stable",
+
+      totalIssues:
+        auditData.totalIssues ?? 0,
+
+      topIssues:
+        Array.isArray(
+          auditData.topIssues
+        )
+          ? auditData.topIssues
+          : [],
+
+      regressions:
+        Array.isArray(
+          auditData.regressions
+        )
+          ? auditData.regressions
+          : [],
+
+      detectedThemes:
+        Array.isArray(
+          auditData.detectedThemes
+        )
+          ? auditData.detectedThemes
+          : [],
+
+      crawlDiagnostics: {
+        slow:
+          auditData.isSlow ?? false,
+
+        durationMs:
+          auditData.durationMs ?? null,
+
+        failureReason:
+          auditData.failureReason ??
+          null
+      }
+    })
+
+  // Save AI insights into audit row
+  if (auditData.auditId) {
+
+    const { createClient } =
+      await import(
+        "@supabase/supabase-js"
+      )
+
+    const supabase =
+      createClient(
+        process.env
+          .NEXT_PUBLIC_SUPABASE_URL!,
+        process.env
+          .SUPABASE_SERVICE_ROLE_KEY!
+      )
+
+    await supabase
+      .from("audits")
+      .update({
+        ai_insights: aiInsights
+      })
+      .eq(
+        "id",
+        auditData.auditId
+      )
+
+  }
+
+} catch (error) {
+
+  console.error(
+    "AI insight generation failed:",
+    error
+  )
+
+}
       return NextResponse.json(
         result,
         {
