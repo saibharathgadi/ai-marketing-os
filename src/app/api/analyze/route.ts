@@ -11,6 +11,7 @@ import { validateWebsiteUrl } from "@/utils/urlValidation"
 export async function POST(req: Request) {
 
   try {
+
     const rateLimit =
       checkRateLimit({
         key: getRequestKey(
@@ -22,6 +23,7 @@ export async function POST(req: Request) {
       })
 
     if (!rateLimit.allowed) {
+
       return NextResponse.json(
         {
           success: false,
@@ -40,13 +42,17 @@ export async function POST(req: Request) {
           }
         }
       )
+
     }
 
     let body: unknown
 
     try {
+
       body = await req.json()
+
     } catch {
+
       return NextResponse.json(
         {
           success: false,
@@ -57,6 +63,7 @@ export async function POST(req: Request) {
           status: 400
         }
       )
+
     }
 
     const urlValidation =
@@ -85,22 +92,31 @@ export async function POST(req: Request) {
 
     await updateMonitoredWebsiteDiagnostics({
       url: urlValidation.url,
+
       success: result.success,
+
       failureReason:
         result.success
           ? result.data.failureReason
           : result.failureReason,
+
       durationMs:
         result.success
           ? result.data.durationMs
           : result.durationMs,
+
       isSlow:
         result.success
           ? result.data.isSlow
           : false
     })
 
+    // ======================================================
+    // HANDLE FAILED AUDITS FIRST
+    // ======================================================
+
     if (!result.success) {
+
       const status =
         result.status === "locked"
           ? 409
@@ -109,107 +125,125 @@ export async function POST(req: Request) {
             : result.status === "invalid"
               ? 400
               : 400
-        // ======================================================
-// AI INSIGHT GENERATION
-// ======================================================
 
-try {
-
-  const auditData = result.data
-
-  const aiInsights =
-    await generateAIInsights({
-      seoScore:
-        auditData.seoScore ?? 0,
-
-      healthStatus:
-        auditData.healthStatus ??
-        "Stable",
-
-      totalIssues:
-        auditData.totalIssues ?? 0,
-
-      topIssues:
-        Array.isArray(
-          auditData.topIssues
-        )
-          ? auditData.topIssues
-          : [],
-
-      regressions:
-        Array.isArray(
-          auditData.regressions
-        )
-          ? auditData.regressions
-          : [],
-
-      detectedThemes:
-        Array.isArray(
-          auditData.detectedThemes
-        )
-          ? auditData.detectedThemes
-          : [],
-
-      crawlDiagnostics: {
-        slow:
-          auditData.isSlow ?? false,
-
-        durationMs:
-          auditData.durationMs ?? null,
-
-        failureReason:
-          auditData.failureReason ??
-          null
-      }
-    })
-
-  // Save AI insights into audit row
-  if (auditData.auditId) {
-
-    const { createClient } =
-      await import(
-        "@supabase/supabase-js"
-      )
-
-    const supabase =
-      createClient(
-        process.env
-          .NEXT_PUBLIC_SUPABASE_URL!,
-        process.env
-          .SUPABASE_SERVICE_ROLE_KEY!
-      )
-
-    await supabase
-      .from("audits")
-      .update({
-        ai_insights: aiInsights
-      })
-      .eq(
-        "id",
-        auditData.auditId
-      )
-
-  }
-
-} catch (error) {
-
-  console.error(
-    "AI insight generation failed:",
-    error
-  )
-
-}
       return NextResponse.json(
         result,
         {
           status
         }
       )
+
     }
+
+    // ======================================================
+    // SUCCESS PATH
+    // TypeScript now knows:
+    // result.success === true
+    // ======================================================
+
+    const auditData = result.data
+
+    // ======================================================
+    // AI INSIGHT GENERATION
+    // ======================================================
+
+    try {
+
+      const aiInsights =
+        await generateAIInsights({
+          seoScore:
+            auditData.seoScore ?? 0,
+
+          healthStatus:
+            auditData.healthStatus ??
+            "Stable",
+
+          totalIssues:
+            auditData.totalIssues ?? 0,
+
+          topIssues:
+            Array.isArray(
+              auditData.topIssues
+            )
+              ? auditData.topIssues
+              : [],
+
+          regressions:
+            Array.isArray(
+              auditData.regressions
+            )
+              ? auditData.regressions
+              : [],
+
+          detectedThemes:
+            Array.isArray(
+              auditData.detectedThemes
+            )
+              ? auditData.detectedThemes
+              : [],
+
+          crawlDiagnostics: {
+            slow:
+              auditData.isSlow ?? false,
+
+            durationMs:
+              auditData.durationMs ??
+              null,
+
+            failureReason:
+              auditData.failureReason ??
+              null
+          }
+        })
+
+      // ======================================================
+      // SAVE AI INSIGHTS
+      // ======================================================
+
+      if (auditData.auditId) {
+
+        const { createClient } =
+          await import(
+            "@supabase/supabase-js"
+          )
+
+        const supabase =
+          createClient(
+            process.env
+              .NEXT_PUBLIC_SUPABASE_URL!,
+            process.env
+              .SUPABASE_SERVICE_ROLE_KEY!
+          )
+
+        await supabase
+          .from("audits")
+          .update({
+            ai_insights:
+              aiInsights
+          })
+          .eq(
+            "id",
+            auditData.auditId
+          )
+
+      }
+
+    } catch (error) {
+
+      console.error(
+        "AI insight generation failed:",
+        error
+      )
+
+    }
+
+    // ======================================================
+    // FINAL RESPONSE
+    // ======================================================
 
     return NextResponse.json({
       success: true,
-      data: result.data,
+      data: auditData,
       queue: result.queue
     })
 
@@ -220,7 +254,8 @@ try {
     return NextResponse.json(
       {
         success: false,
-        error: "Failed to analyze website."
+        error:
+          "Failed to analyze website."
       },
       {
         status: 500
@@ -228,4 +263,5 @@ try {
     )
 
   }
+
 }
