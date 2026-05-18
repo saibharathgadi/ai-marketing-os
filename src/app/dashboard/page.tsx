@@ -18,6 +18,13 @@ type Audit = {
   crawl_failure_reason?: string | null
   crawl_status?: string | null
   is_slow?: boolean | null
+  ai_insights?: {
+  executiveSummary?: string
+  weeklyFocus?: string
+  priorityActions?: {
+    title: string
+  }[]
+} | null
 }
 
 type QueueMetrics = {
@@ -35,10 +42,10 @@ const defaultQueueMetrics: QueueMetrics = {
 }
 
 const auditSelect =
-  "id,url,average_score,total_pages,total_issues,created_at,crawl_duration_ms,crawl_failure_reason,crawl_status,is_slow"
+  "id,url,average_score,total_pages,total_issues,created_at,crawl_duration_ms,crawl_failure_reason,crawl_status,is_slow,ai_insights"
 
 const fallbackAuditSelect =
-  "id,url,average_score,total_pages,total_issues,created_at"
+  "id,url,average_score,total_pages,total_issues,created_at,ai_insights"
 
 function isMissingDiagnosticsColumn(
   message: string
@@ -386,6 +393,86 @@ export default function DashboardPage() {
                     audit.created_at
                   )}
                 </p>
+                {audit.ai_insights ? (
+
+  <div className="mt-6 rounded-xl border border-zinc-800 bg-zinc-950 p-4 space-y-4">
+
+    <div>
+
+      <h3 className="text-sm font-semibold text-white">
+        AI Executive Summary
+      </h3>
+
+      <p className="text-sm text-zinc-400 mt-2">
+        {
+          audit.ai_insights
+            .executiveSummary
+        }
+      </p>
+
+    </div>
+
+    <div>
+
+      <h4 className="text-sm font-medium text-white">
+        Weekly Focus
+      </h4>
+
+      <p className="text-sm text-zinc-400 mt-2">
+        {
+          audit.ai_insights
+            .weeklyFocus
+        }
+      </p>
+
+    </div>
+
+    {Array.isArray(
+      audit.ai_insights
+        .priorityActions
+    ) &&
+      audit.ai_insights
+        .priorityActions.length >
+        0 && (
+
+      <div>
+
+        <h4 className="text-sm font-medium text-white mb-2">
+          Top Priorities
+        </h4>
+
+        <ul className="space-y-2 text-sm text-zinc-300">
+
+          {audit.ai_insights.priorityActions
+            .slice(0, 3)
+            .map(
+              (
+                action,
+                index
+              ) => (
+
+                <li key={index}>
+                  • {action.title}
+                </li>
+
+              )
+            )}
+
+        </ul>
+
+      </div>
+
+    )}
+
+  </div>
+
+) : (
+
+  <p className="mt-6 text-sm text-zinc-500">
+    AI insights not available for this audit.
+  </p>
+
+)}
 
               </div>
 
