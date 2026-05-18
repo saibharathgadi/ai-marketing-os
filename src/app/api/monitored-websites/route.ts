@@ -131,30 +131,14 @@ export async function POST(
     )
   }
 
-  let insertResponse =
+  const insertResponse =
     await supabase
       .from("monitored_websites")
       .insert({
         url: urlValidation.url
       })
-      .select(monitoredWebsiteSelect)
+      .select(fallbackMonitoredWebsiteSelect)
       .single()
-
-  if (
-    insertResponse.error &&
-    isMissingDiagnosticsColumn(
-      insertResponse.error.message
-    )
-  ) {
-    insertResponse =
-      await supabase
-        .from("monitored_websites")
-        .insert({
-          url: urlValidation.url
-        })
-        .select(fallbackMonitoredWebsiteSelect)
-        .single()
-  }
 
   if (insertResponse.error) {
 

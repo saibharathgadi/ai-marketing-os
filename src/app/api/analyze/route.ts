@@ -148,39 +148,54 @@ export async function POST(req: Request) {
     // ======================================================
 
     try {
+      const topIssues =
+        (auditData.crawledPages || [])
+          .flatMap(
+            (page) =>
+              page.seoIssues || []
+          )
+          .filter(
+            (
+              issue,
+              index,
+              issues
+            ) =>
+              issues.indexOf(issue) ===
+              index
+          )
+
+      const seoScore =
+        auditData.siteSummary
+          ?.averageSeoScore ?? 0
+      const totalIssues =
+        auditData.siteSummary
+          ?.totalIssues ?? 0
+      const healthStatus =
+        seoScore >= 85
+          ? "Stable"
+          : seoScore >= 70
+            ? "Warning"
+            : "Critical"
 
       const aiInsights =
         await generateAIInsights({
           seoScore:
-            auditData.seoScore ?? 0,
+            seoScore,
 
           healthStatus:
-            auditData.healthStatus ??
-            "Stable",
+            healthStatus,
 
           totalIssues:
-            auditData.totalIssues ?? 0,
+            totalIssues,
 
           topIssues:
-            Array.isArray(
-              auditData.topIssues
-            )
-              ? auditData.topIssues
-              : [],
+            topIssues,
 
           regressions:
-            Array.isArray(
-              auditData.regressions
-            )
-              ? auditData.regressions
-              : [],
+            [],
 
           detectedThemes:
-            Array.isArray(
-              auditData.detectedThemes
-            )
-              ? auditData.detectedThemes
-              : [],
+            [],
 
           crawlDiagnostics: {
             slow:

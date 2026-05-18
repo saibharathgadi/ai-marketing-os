@@ -772,6 +772,8 @@ export async function crawlWebsite(url: string) {
 
   }
 
+  let auditId: string | null = null
+
   try {
     const durationMs =
       getDurationMs()
@@ -798,6 +800,8 @@ export async function crawlWebsite(url: string) {
         is_slow:
           isSlow
       })
+
+    auditId = auditData.id
 
     await persistCrawledPages(
       auditData.id,
@@ -829,6 +833,7 @@ export async function crawlWebsite(url: string) {
   return {
 
     success: true,
+    auditId,
     durationMs:
       getDurationMs(),
     isSlow:

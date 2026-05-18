@@ -44,8 +44,6 @@ export function generateFallbackInsights(
 ): AIInsights {
   const {
     seoScore,
-    healthStatus,
-    totalIssues,
     topIssues,
     regressions = [],
     detectedThemes = []
