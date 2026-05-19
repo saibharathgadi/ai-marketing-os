@@ -8,7 +8,9 @@ import {
 import { updateMonitoredWebsiteDiagnostics } from "@/utils/monitoredWebsiteDiagnostics"
 import { validateWebsiteUrl } from "@/utils/urlValidation"
 
-export async function POST(req: Request) {
+export async function POST(
+  req: Request
+) {
 
   try {
 
@@ -68,15 +70,20 @@ export async function POST(req: Request) {
 
     const urlValidation =
       validateWebsiteUrl(
-        (body as { url?: unknown }).url
+        (body as {
+          url?: unknown
+        }).url
       )
 
-    if (!urlValidation.success) {
+    if (
+      !urlValidation.success
+    ) {
 
       return NextResponse.json(
         {
           success: false,
-          error: urlValidation.error
+          error:
+            urlValidation.error
         },
         {
           status: 400
@@ -91,38 +98,46 @@ export async function POST(req: Request) {
       )
 
     await updateMonitoredWebsiteDiagnostics({
-      url: urlValidation.url,
+      url:
+        urlValidation.url,
 
-      success: result.success,
+      success:
+        result.success,
 
       failureReason:
         result.success
-          ? result.data.failureReason
+          ? result.data
+              .failureReason
           : result.failureReason,
 
       durationMs:
         result.success
-          ? result.data.durationMs
+          ? result.data
+              .durationMs
           : result.durationMs,
 
       isSlow:
         result.success
-          ? result.data.isSlow
+          ? result.data
+              .isSlow
           : false
     })
 
     // ======================================================
-    // HANDLE FAILED AUDITS FIRST
+    // HANDLE FAILED AUDITS
     // ======================================================
 
     if (!result.success) {
 
       const status =
-        result.status === "locked"
+        result.status ===
+        "locked"
           ? 409
-          : result.status === "queue_full"
+          : result.status ===
+              "queue_full"
             ? 503
-            : result.status === "invalid"
+            : result.status ===
+                "invalid"
               ? 400
               : 400
 
@@ -137,39 +152,51 @@ export async function POST(req: Request) {
 
     // ======================================================
     // SUCCESS PATH
-    // TypeScript now knows:
-    // result.success === true
     // ======================================================
 
-    const auditData = result.data
+    const auditData =
+      result.data
 
     // ======================================================
     // AI INSIGHT GENERATION
     // ======================================================
 
     try {
+
       const topIssues =
-        (auditData.crawledPages || [])
+        (
+          auditData.crawledPages ||
+          []
+        )
           .flatMap(
-            (page) =>
-              page.seoIssues || []
+            (
+              page: {
+                seoIssues?: string[]
+              }
+            ) =>
+              page.seoIssues ||
+              []
           )
           .filter(
             (
-              issue,
-              index,
-              issues
+              issue: string,
+              index: number,
+              issues: string[]
             ) =>
-              issues.indexOf(issue) ===
-              index
+              issues.indexOf(
+                issue
+              ) === index
           )
 
       const seoScore =
         auditData.siteSummary
-          ?.averageSeoScore ?? 0
+          ?.averageSeoScore ??
+        0
+
       const totalIssues =
         auditData.siteSummary
           ?.totalIssues ?? 0
+
       const healthStatus =
         seoScore >= 85
           ? "Stable"
@@ -179,27 +206,22 @@ export async function POST(req: Request) {
 
       const aiInsights =
         await generateAIInsights({
-          seoScore:
-            seoScore,
+          seoScore,
 
-          healthStatus:
-            healthStatus,
+          healthStatus,
 
-          totalIssues:
-            totalIssues,
+          totalIssues,
 
-          topIssues:
-            topIssues,
+          topIssues,
 
-          regressions:
-            [],
+          regressions: [],
 
-          detectedThemes:
-            [],
+          detectedThemes: [],
 
           crawlDiagnostics: {
             slow:
-              auditData.isSlow ?? false,
+              auditData.isSlow ??
+              false,
 
             durationMs:
               auditData.durationMs ??
@@ -211,45 +233,10 @@ export async function POST(req: Request) {
           }
         })
 
-      // ======================================================
-      // SAVE AI INSIGHTS
-      // ======================================================
-
-      if (auditData.auditId) {
-
-        const { createClient } =
-          await import(
-            "@supabase/supabase-js"
-          )
-
-        const supabase =
-          createClient(
-            process.env
-              .NEXT_PUBLIC_SUPABASE_URL!,
-            process.env
-              .SUPABASE_SERVICE_ROLE_KEY!
-          )
-            console.log(
-  "Saving AI insights for audit:",
-  auditData.auditId
-)
-
-console.log(
-  "AI insights payload:",
-  aiInsights
-)
-        await supabase
-          .from("audits")
-          .update({
-            ai_insights:
-              aiInsights
-          })
-          .eq(
-            "id",
-            auditData.auditId
-          )
-
-      }
+      console.log(
+        "AI insights payload:",
+        aiInsights
+      )
 
     } catch (error) {
 
