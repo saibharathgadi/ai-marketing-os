@@ -7,6 +7,59 @@ import {
 } from "@/utils/rateLimit"
 import { updateMonitoredWebsiteDiagnostics } from "@/utils/monitoredWebsiteDiagnostics"
 import { validateWebsiteUrl } from "@/utils/urlValidation"
+import { supabase } from "@/lib/supabase"
+
+function isMissingAIInsightsColumn(
+  message: string
+) {
+  const normalized =
+    message.toLowerCase()
+
+  return (
+    normalized.includes("ai_insights") ||
+    normalized.includes("schema cache")
+  )
+}
+
+async function persistAIInsights(
+  auditId: string | null | undefined,
+  aiInsights: Awaited<
+    ReturnType<typeof generateAIInsights>
+  >
+) {
+  if (!auditId) {
+    return
+  }
+
+  const { error } =
+    await supabase
+      .from("audits")
+      .update({
+        ai_insights: aiInsights
+      })
+      .eq("id", auditId)
+
+  if (!error) {
+    return
+  }
+
+  if (
+    isMissingAIInsightsColumn(
+      error.message
+    )
+  ) {
+    console.warn(
+      "ai_insights column is missing on audits; continuing without persisted AI insights."
+    )
+
+    return
+  }
+
+  console.error(
+    "Failed to persist AI insights:",
+    error
+  )
+}
 
 export async function POST(
   req: Request
@@ -156,6 +209,9 @@ export async function POST(
 
     const auditData =
       result.data
+    let aiInsights: Awaited<
+      ReturnType<typeof generateAIInsights>
+    > | null = null
 
     // ======================================================
     // AI INSIGHT GENERATION
@@ -204,7 +260,7 @@ export async function POST(
             ? "Warning"
             : "Critical"
 
-      const aiInsights =
+      aiInsights =
         await generateAIInsights({
           seoScore,
 
@@ -233,8 +289,8 @@ export async function POST(
           }
         })
 
-      console.log(
-        "AI insights payload:",
+      await persistAIInsights(
+        auditData.auditId,
         aiInsights
       )
 
@@ -254,6 +310,7 @@ export async function POST(
     return NextResponse.json({
       success: true,
       data: auditData,
+      aiInsights,
       queue: result.queue
     })
 

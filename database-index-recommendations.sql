@@ -7,7 +7,8 @@ alter table public.audits
 add column if not exists crawl_duration_ms integer,
 add column if not exists crawl_status text,
 add column if not exists crawl_failure_reason text,
-add column if not exists is_slow boolean not null default false;
+add column if not exists is_slow boolean not null default false,
+add column if not exists ai_insights jsonb;
 
 alter table public.monitored_websites
 add column if not exists last_failure_reason text,
