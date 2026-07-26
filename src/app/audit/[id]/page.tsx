@@ -1,4 +1,5 @@
 import Link from "next/link"
+import type { Metadata } from "next"
 import { supabase } from "@/lib/supabase"
 import { formatLocalTimestamp } from "@/lib/date"
 import {
@@ -6,6 +7,13 @@ import {
   RegressionAlert,
   RegressionHealthStatus
 } from "@/utils/seoRegression"
+
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false
+  }
+}
 
 type AuditRow = {
   id: string
