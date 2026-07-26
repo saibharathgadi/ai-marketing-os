@@ -19,6 +19,7 @@ import {
 
 type Audit = {
   id: string
+  url: string
   average_score: number
   total_issues: number
   total_pages: number
@@ -404,14 +405,26 @@ export default function DashboardCharts({
     chronologicalAudits[
       chronologicalAudits.length - 1
     ]
+
+  // Regression/trend comparisons only make sense within a single
+  // website's own history — comparing the two most recent audits
+  // site-wide would compare unrelated websites whenever more than one
+  // site is monitored.
+  const sameWebsiteAudits =
+    latestAudit
+      ? chronologicalAudits.filter(
+          (audit) =>
+            audit.url === latestAudit.url
+        )
+      : []
   const previousAudit =
-    chronologicalAudits.length > 1
-      ? chronologicalAudits[
-          chronologicalAudits.length - 2
+    sameWebsiteAudits.length > 1
+      ? sameWebsiteAudits[
+          sameWebsiteAudits.length - 2
         ]
       : undefined
   const trendData =
-    buildTrendData(audits)
+    buildTrendData(sameWebsiteAudits)
   const regression =
     analyzeSeoRegression({
       currentAudit:
@@ -443,8 +456,10 @@ export default function DashboardCharts({
             Historical Analytics
           </h2>
 
-          <p className="text-zinc-400 mt-2">
-            Audit-to-audit SEO movement across saved reports.
+          <p className="text-zinc-400 mt-2 break-all">
+            {latestAudit
+              ? `Audit-to-audit SEO movement for ${latestAudit.url}, your most recently audited site.`
+              : "Audit-to-audit SEO movement across saved reports."}
           </p>
 
         </div>

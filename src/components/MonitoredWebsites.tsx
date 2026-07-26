@@ -281,7 +281,10 @@ export default function MonitoredWebsites({
 
       const response =
         await fetch(
-          "/api/run-scheduled-audits"
+          "/api/monitored-websites/run-all",
+          {
+            method: "POST"
+          }
         )
 
       const result =

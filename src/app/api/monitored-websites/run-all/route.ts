@@ -5,53 +5,21 @@ import {
 } from "@/utils/rateLimit"
 import { runMonitoredWebsiteAudits } from "@/utils/runMonitoredWebsiteAudits"
 
-function isAuthorizedRequest(request: Request) {
-  const cronSecret =
-    process.env.CRON_SECRET
-
-  if (!cronSecret) {
-    if (process.env.NODE_ENV !== "production") {
-      return true
-    }
-
-    console.error(
-      "CRON_SECRET is not configured; refusing to run scheduled audits in production."
-    )
-
-    return false
-  }
-
-  const authorization =
-    request.headers.get("authorization")
-
-  const cronHeader =
-    request.headers.get("x-cron-secret")
-
-  return (
-    authorization === `Bearer ${cronSecret}` ||
-    cronHeader === cronSecret
-  )
-}
-
-export async function GET(request: Request) {
-
-  if (!isAuthorizedRequest(request)) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Unauthorized"
-      },
-      {
-        status: 401
-      }
-    )
-  }
+/**
+ * Interactive counterpart to /api/run-scheduled-audits. That endpoint is
+ * gated by CRON_SECRET for automated/external callers; this one is what
+ * the dashboard's "Run Scheduled Audits" button calls directly from the
+ * browser, so it deliberately does not require the cron secret (a
+ * browser fetch can't safely hold one). Rate limiting is the only
+ * abuse guard here until real user authentication exists.
+ */
+export async function POST(request: Request) {
 
   const rateLimit =
     checkRateLimit({
       key: getRequestKey(
         request,
-        "scheduled-audits"
+        "run-all-monitored-websites"
       ),
       limit: 3,
       windowMs: 60_000
@@ -62,7 +30,7 @@ export async function GET(request: Request) {
       {
         success: false,
         error:
-          "Too many scheduled audit requests. Please try again shortly.",
+          "Too many requests. Please try again shortly.",
         retryAfterSeconds:
           rateLimit.retryAfterSeconds
       },
