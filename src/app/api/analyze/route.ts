@@ -1,4 +1,4 @@
-import { generateAIInsights } from "@/utils/aiCopilot"
+import { generateAndPersistAuditInsights } from "@/utils/aiCopilot"
 import { NextResponse } from "next/server"
 import { enqueueAudit } from "@/utils/auditQueue"
 import {
@@ -7,59 +7,6 @@ import {
 } from "@/utils/rateLimit"
 import { updateMonitoredWebsiteDiagnostics } from "@/utils/monitoredWebsiteDiagnostics"
 import { validateWebsiteUrl } from "@/utils/urlValidation"
-import { supabase } from "@/lib/supabase"
-
-function isMissingAIInsightsColumn(
-  message: string
-) {
-  const normalized =
-    message.toLowerCase()
-
-  return (
-    normalized.includes("ai_insights") ||
-    normalized.includes("schema cache")
-  )
-}
-
-async function persistAIInsights(
-  auditId: string | null | undefined,
-  aiInsights: Awaited<
-    ReturnType<typeof generateAIInsights>
-  >
-) {
-  if (!auditId) {
-    return
-  }
-
-  const { error } =
-    await supabase
-      .from("audits")
-      .update({
-        ai_insights: aiInsights
-      })
-      .eq("id", auditId)
-
-  if (!error) {
-    return
-  }
-
-  if (
-    isMissingAIInsightsColumn(
-      error.message
-    )
-  ) {
-    console.warn(
-      "ai_insights column is missing on audits; continuing without persisted AI insights."
-    )
-
-    return
-  }
-
-  console.error(
-    "Failed to persist AI insights:",
-    error
-  )
-}
 
 export async function POST(
   req: Request
@@ -209,99 +156,15 @@ export async function POST(
 
     const auditData =
       result.data
-    let aiInsights: Awaited<
-      ReturnType<typeof generateAIInsights>
-    > | null = null
 
     // ======================================================
     // AI INSIGHT GENERATION
     // ======================================================
 
-    try {
-
-      const topIssues =
-        (
-          auditData.crawledPages ||
-          []
-        )
-          .flatMap(
-            (
-              page: {
-                seoIssues?: string[]
-              }
-            ) =>
-              page.seoIssues ||
-              []
-          )
-          .filter(
-            (
-              issue: string,
-              index: number,
-              issues: string[]
-            ) =>
-              issues.indexOf(
-                issue
-              ) === index
-          )
-
-      const seoScore =
-        auditData.siteSummary
-          ?.averageSeoScore ??
-        0
-
-      const totalIssues =
-        auditData.siteSummary
-          ?.totalIssues ?? 0
-
-      const healthStatus =
-        seoScore >= 85
-          ? "Stable"
-          : seoScore >= 70
-            ? "Warning"
-            : "Critical"
-
-      aiInsights =
-        await generateAIInsights({
-          seoScore,
-
-          healthStatus,
-
-          totalIssues,
-
-          topIssues,
-
-          regressions: [],
-
-          detectedThemes: [],
-
-          crawlDiagnostics: {
-            slow:
-              auditData.isSlow ??
-              false,
-
-            durationMs:
-              auditData.durationMs ??
-              null,
-
-            failureReason:
-              auditData.failureReason ??
-              null
-          }
-        })
-
-      await persistAIInsights(
-        auditData.auditId,
-        aiInsights
+    const aiInsights =
+      await generateAndPersistAuditInsights(
+        auditData
       )
-
-    } catch (error) {
-
-      console.error(
-        "AI insight generation failed:",
-        error
-      )
-
-    }
 
     // ======================================================
     // FINAL RESPONSE

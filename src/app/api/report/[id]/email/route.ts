@@ -89,12 +89,31 @@ export async function POST(
     )
   }
 
-  const { data: audit } =
+  const { data: audit, error: auditError } =
     await supabase
       .from("audits")
       .select("*")
       .eq("id", id)
       .single()
+
+  if (auditError && auditError.code !== "PGRST116") {
+
+    console.error(
+      "Failed to fetch audit for report email:",
+      auditError
+    )
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to load audit."
+      },
+      {
+        status: 500
+      }
+    )
+
+  }
 
   if (!audit) {
 

@@ -47,6 +47,15 @@ export function getRequestKey(
   request: Request,
   scope: string
 ) {
+  // Vercel overwrites this header at the edge with the real client IP,
+  // so unlike x-forwarded-for/x-real-ip it cannot be spoofed by the
+  // client to obtain a fresh rate-limit bucket on every request.
+  const vercelForwardedFor =
+    request.headers
+      .get("x-vercel-forwarded-for")
+      ?.split(",")[0]
+      ?.trim()
+
   const forwardedFor =
     request.headers
       .get("x-forwarded-for")
@@ -56,7 +65,7 @@ export function getRequestKey(
   const realIp =
     request.headers.get("x-real-ip")?.trim()
 
-  return `${scope}:${forwardedFor || realIp || "unknown"}`
+  return `${scope}:${vercelForwardedFor || forwardedFor || realIp || "unknown"}`
 }
 
 export function checkRateLimit({

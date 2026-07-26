@@ -19,10 +19,15 @@ export async function DELETE(
 
   if (error) {
 
+    console.error(
+      "Failed to delete monitored website:",
+      error
+    )
+
     return NextResponse.json(
       {
         success: false,
-        error: error.message
+        error: "Failed to delete monitored website."
       },
       {
         status: 500

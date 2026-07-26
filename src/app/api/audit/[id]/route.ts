@@ -11,10 +11,30 @@ export async function DELETE(
   const { id } =
     await context.params
 
-  await supabase
-    .from("crawled_pages")
-    .delete()
-    .eq("audit_id", id)
+  const { error: crawledPagesError } =
+    await supabase
+      .from("crawled_pages")
+      .delete()
+      .eq("audit_id", id)
+
+  if (crawledPagesError) {
+
+    console.error(
+      "Failed to delete crawled pages for audit:",
+      crawledPagesError
+    )
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to delete audit."
+      },
+      {
+        status: 500
+      }
+    )
+
+  }
 
   const { error } =
     await supabase
@@ -24,10 +44,15 @@ export async function DELETE(
 
   if (error) {
 
+    console.error(
+      "Failed to delete audit:",
+      error
+    )
+
     return NextResponse.json(
       {
         success: false,
-        error: error.message
+        error: "Failed to delete audit."
       },
       {
         status: 500
