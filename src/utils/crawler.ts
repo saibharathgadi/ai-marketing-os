@@ -6,6 +6,8 @@ import {
   fetchWithSsrfProtection,
   validateWebsiteUrl
 } from "./urlValidation"
+import { isMissingColumnError } from "./schemaCompat"
+import { generateSiteSummary } from "./summary"
 
 type TechnicalSeoResult = Awaited<
   ReturnType<typeof analyzeTechnicalSeo>
@@ -457,16 +459,17 @@ async function createAuditRecord(
     return withTechnicalSeo.data as AuditInsertResult
   }
 
-  const message =
-    withTechnicalSeo.error.message.toLowerCase()
-
   const missingTechnicalSeoColumn =
-    message.includes("technical_seo") ||
-    message.includes("crawl_duration_ms") ||
-    message.includes("crawl_status") ||
-    message.includes("crawl_failure_reason") ||
-    message.includes("is_slow") ||
-    message.includes("schema cache")
+    isMissingColumnError(
+      withTechnicalSeo.error.message,
+      [
+        "technical_seo",
+        "crawl_duration_ms",
+        "crawl_status",
+        "crawl_failure_reason",
+        "is_slow"
+      ]
+    )
 
   if (!missingTechnicalSeoColumn) {
     throw new Error(
@@ -725,54 +728,11 @@ export async function crawlWebsite(url: string) {
     )
   )
 
-  const averageSeoScore =
-    Math.round(
-      crawledPages.reduce(
-        (acc, page) =>
-          acc + page.seoScore,
-        0
-      ) / crawledPages.length
-    )
+  const siteSummary =
+    generateSiteSummary(crawledPages)
 
-  const totalIssues =
-    crawledPages.reduce(
-      (acc, page) =>
-        acc + page.seoIssues.length,
-      0
-    )
-
-  const bestPage =
-    crawledPages.reduce(
-      (best, current) =>
-        current.seoScore >
-        best.seoScore
-          ? current
-          : best
-    )
-
-  const worstPage =
-    crawledPages.reduce(
-      (worst, current) =>
-        current.seoScore <
-        worst.seoScore
-          ? current
-          : worst
-    )
-
-  const siteSummary = {
-
-    totalPages:
-      crawledPages.length,
-
-    averageSeoScore,
-
-    totalIssues,
-
-    bestPage,
-
-    worstPage
-
-  }
+  const { averageSeoScore, totalIssues } =
+    siteSummary
 
   let auditId: string | null = null
 

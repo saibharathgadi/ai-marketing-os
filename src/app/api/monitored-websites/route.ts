@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase"
 import { validateWebsiteUrl } from "@/utils/urlValidation"
+import { isMissingColumnError } from "@/utils/schemaCompat"
 
 const monitoredWebsiteSelect =
   "id,url,last_audited_at,last_failure_reason,last_audit_duration_ms,last_audit_status,last_audit_is_slow,created_at"
@@ -8,26 +9,19 @@ const monitoredWebsiteSelect =
 const fallbackMonitoredWebsiteSelect =
   "id,url,last_audited_at,created_at"
 
+const diagnosticsColumns = [
+  "last_failure_reason",
+  "last_audit_duration_ms",
+  "last_audit_status",
+  "last_audit_is_slow"
+]
+
 function isMissingDiagnosticsColumn(
   message: string
 ) {
-  const normalized =
-    message.toLowerCase()
-
-  return (
-    normalized.includes(
-      "last_failure_reason"
-    ) ||
-    normalized.includes(
-      "last_audit_duration_ms"
-    ) ||
-    normalized.includes(
-      "last_audit_status"
-    ) ||
-    normalized.includes(
-      "last_audit_is_slow"
-    ) ||
-    normalized.includes("schema cache")
+  return isMissingColumnError(
+    message,
+    diagnosticsColumns
   )
 }
 

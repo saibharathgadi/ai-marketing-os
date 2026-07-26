@@ -1,5 +1,13 @@
 import { supabase } from "@/lib/supabase"
 import type { CrawlFailureReason } from "./crawler"
+import { isMissingColumnError } from "./schemaCompat"
+
+const diagnosticsColumns = [
+  "last_failure_reason",
+  "last_audit_duration_ms",
+  "last_audit_status",
+  "last_audit_is_slow"
+]
 
 type DiagnosticsPayload = {
   id?: string
@@ -13,23 +21,9 @@ type DiagnosticsPayload = {
 function isMissingDiagnosticsColumn(
   message: string
 ) {
-  const normalized =
-    message.toLowerCase()
-
-  return (
-    normalized.includes(
-      "last_failure_reason"
-    ) ||
-    normalized.includes(
-      "last_audit_duration_ms"
-    ) ||
-    normalized.includes(
-      "last_audit_status"
-    ) ||
-    normalized.includes(
-      "last_audit_is_slow"
-    ) ||
-    normalized.includes("schema cache")
+  return isMissingColumnError(
+    message,
+    diagnosticsColumns
   )
 }
 

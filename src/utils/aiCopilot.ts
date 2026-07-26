@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase"
+import { isMissingColumnError } from "./schemaCompat"
 
 export type AIInsights = {
   executiveSummary: string
@@ -323,18 +324,6 @@ Required JSON structure:
   }
 }
 
-function isMissingAIInsightsColumn(
-  message: string
-) {
-  const normalized =
-    message.toLowerCase()
-
-  return (
-    normalized.includes("ai_insights") ||
-    normalized.includes("schema cache")
-  )
-}
-
 export async function persistAIInsights(
   auditId: string | null | undefined,
   aiInsights: AIInsights
@@ -355,7 +344,7 @@ export async function persistAIInsights(
     return
   }
 
-  if (isMissingAIInsightsColumn(error.message)) {
+  if (isMissingColumnError(error.message, ["ai_insights"])) {
     console.warn(
       "ai_insights column is missing on audits; continuing without persisted AI insights."
     )

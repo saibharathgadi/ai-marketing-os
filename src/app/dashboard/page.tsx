@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase"
 import { formatLocalTimestamp } from "@/lib/date"
 import DashboardCharts from "@/components/DashboardCharts"
 import MonitoredWebsites from "@/components/MonitoredWebsites"
+import { isMissingColumnError } from "@/utils/schemaCompat"
 
 type Audit = {
   id: string
@@ -50,20 +51,15 @@ const fallbackAuditSelect =
 function isMissingDiagnosticsColumn(
   message: string
 ) {
-  const normalized =
-    message.toLowerCase()
-
-  return (
-    normalized.includes(
-      "crawl_duration_ms"
-    ) ||
-    normalized.includes(
-      "crawl_failure_reason"
-    ) ||
-    normalized.includes("crawl_status") ||
-    normalized.includes("is_slow") ||
-    normalized.includes("ai_insights") ||
-    normalized.includes("schema cache")
+  return isMissingColumnError(
+    message,
+    [
+      "crawl_duration_ms",
+      "crawl_failure_reason",
+      "crawl_status",
+      "is_slow",
+      "ai_insights"
+    ]
   )
 }
 
