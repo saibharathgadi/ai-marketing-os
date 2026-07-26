@@ -14,7 +14,8 @@ alter table public.monitored_websites
 add column if not exists last_failure_reason text,
 add column if not exists last_audit_duration_ms integer,
 add column if not exists last_audit_status text,
-add column if not exists last_audit_is_slow boolean not null default false;
+add column if not exists last_audit_is_slow boolean not null default false,
+add column if not exists notification_email text;
 
 create index if not exists audits_created_at_idx
 on public.audits (created_at desc);

@@ -1,19 +1,24 @@
 import { NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase"
 import { validateWebsiteUrl } from "@/utils/urlValidation"
+import { validateReportRecipient } from "@/utils/emailReport"
 import { isMissingColumnError } from "@/utils/schemaCompat"
 
 const monitoredWebsiteSelect =
-  "id,url,last_audited_at,last_failure_reason,last_audit_duration_ms,last_audit_status,last_audit_is_slow,created_at"
+  "id,url,last_audited_at,last_failure_reason,last_audit_duration_ms,last_audit_status,last_audit_is_slow,notification_email,created_at"
 
 const fallbackMonitoredWebsiteSelect =
   "id,url,last_audited_at,created_at"
+
+const insertSelect =
+  "id,url,last_audited_at,notification_email,created_at"
 
 const diagnosticsColumns = [
   "last_failure_reason",
   "last_audit_duration_ms",
   "last_audit_status",
-  "last_audit_is_slow"
+  "last_audit_is_slow",
+  "notification_email"
 ]
 
 function isMissingDiagnosticsColumn(
@@ -59,7 +64,8 @@ export async function GET() {
               last_failure_reason: null,
               last_audit_duration_ms: null,
               last_audit_status: null,
-              last_audit_is_slow: false
+              last_audit_is_slow: false,
+              notification_email: null
             })
           )
       })
@@ -130,14 +136,58 @@ export async function POST(
     )
   }
 
-  const insertResponse =
+  const notificationEmailInput =
+    (body as { notificationEmail?: unknown })
+      .notificationEmail
+
+  const notificationEmail =
+    typeof notificationEmailInput === "string" &&
+    notificationEmailInput.trim()
+      ? notificationEmailInput.trim()
+      : null
+
+  if (
+    notificationEmail &&
+    !validateReportRecipient(notificationEmail)
+  ) {
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "Please enter a valid notification email."
+      },
+      {
+        status: 400
+      }
+    )
+  }
+
+  let insertResponse =
     await supabase
       .from("monitored_websites")
       .insert({
-        url: urlValidation.url
+        url: urlValidation.url,
+        notification_email: notificationEmail
       })
-      .select(fallbackMonitoredWebsiteSelect)
+      .select(insertSelect)
       .single()
+
+  if (
+    insertResponse.error &&
+    isMissingColumnError(
+      insertResponse.error.message,
+      ["notification_email"]
+    )
+  ) {
+    insertResponse =
+      await supabase
+        .from("monitored_websites")
+        .insert({
+          url: urlValidation.url
+        })
+        .select(fallbackMonitoredWebsiteSelect)
+        .single()
+  }
 
   if (insertResponse.error) {
 
@@ -185,7 +235,13 @@ export async function POST(
         insertResponse.data
           ? insertResponse.data
               .last_audit_is_slow
-          : false
+          : false,
+      notification_email:
+        "notification_email" in
+        insertResponse.data
+          ? insertResponse.data
+              .notification_email
+          : null
     }
   })
 

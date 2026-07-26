@@ -11,6 +11,7 @@ type Website = {
   last_audit_duration_ms?: number | null
   last_audit_status?: string | null
   last_audit_is_slow?: boolean | null
+  notification_email?: string | null
 }
 
 function formatDuration(
@@ -40,6 +41,9 @@ export default function MonitoredWebsites({
     useState<Website[]>([])
 
   const [url, setUrl] =
+    useState("")
+
+  const [notificationEmail, setNotificationEmail] =
     useState("")
 
   const [loading, setLoading] =
@@ -120,7 +124,10 @@ export default function MonitoredWebsites({
             },
 
             body: JSON.stringify({
-              url: normalizedUrl
+              url: normalizedUrl,
+              notificationEmail:
+                notificationEmail.trim() ||
+                undefined
             })
           }
         )
@@ -143,6 +150,7 @@ export default function MonitoredWebsites({
       ])
 
       setUrl("")
+      setNotificationEmail("")
       setStatusMessage(
         "Website saved."
       )
@@ -375,6 +383,18 @@ export default function MonitoredWebsites({
           className="flex-1 rounded-xl bg-black border border-zinc-700 px-5 py-4 outline-none"
         />
 
+        <input
+          type="email"
+          placeholder="Notification email (optional)"
+          value={notificationEmail}
+          onChange={(e) =>
+            setNotificationEmail(
+              e.target.value
+            )
+          }
+          className="flex-1 rounded-xl bg-black border border-zinc-700 px-5 py-4 outline-none"
+        />
+
         <button
           onClick={handleAddWebsite}
           disabled={loading}
@@ -388,6 +408,10 @@ export default function MonitoredWebsites({
         </button>
 
       </div>
+
+      <p className="text-zinc-500 text-sm mt-3">
+        If a notification email is set, you&apos;ll get an alert when a scheduled audit detects a warning or critical SEO regression.
+      </p>
 
       {statusMessage && (
 
@@ -457,6 +481,15 @@ export default function MonitoredWebsites({
                     <span className="rounded-lg bg-red-500/10 px-3 py-2 text-red-300">
                       Last failure:{" "}
                       {website.last_failure_reason}
+                    </span>
+
+                  )}
+
+                  {website.notification_email && (
+
+                    <span className="rounded-lg bg-blue-500/10 px-3 py-2 text-blue-300">
+                      Alerts:{" "}
+                      {website.notification_email}
                     </span>
 
                   )}
