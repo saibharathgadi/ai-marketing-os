@@ -1,3 +1,5 @@
+import { fetchWithSsrfProtection } from "./urlValidation"
+
 async function checkUrl(url: string) {
   for (const method of ["HEAD", "GET"]) {
     const controller =
@@ -11,9 +13,8 @@ async function checkUrl(url: string) {
 
     try {
       const response =
-        await fetch(url, {
+        await fetchWithSsrfProtection(url, {
           method,
-          redirect: "follow",
           signal: controller.signal
         })
 

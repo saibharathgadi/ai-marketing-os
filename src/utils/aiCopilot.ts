@@ -1,3 +1,5 @@
+import { supabase } from "@/lib/supabase"
+
 export type AIInsights = {
   executiveSummary: string
 
@@ -318,5 +320,131 @@ Required JSON structure:
       regressions: context.regressions,
       detectedThemes: context.detectedThemes
     })
+  }
+}
+
+function isMissingAIInsightsColumn(
+  message: string
+) {
+  const normalized =
+    message.toLowerCase()
+
+  return (
+    normalized.includes("ai_insights") ||
+    normalized.includes("schema cache")
+  )
+}
+
+export async function persistAIInsights(
+  auditId: string | null | undefined,
+  aiInsights: AIInsights
+) {
+  if (!auditId) {
+    return
+  }
+
+  const { error } =
+    await supabase
+      .from("audits")
+      .update({
+        ai_insights: aiInsights
+      })
+      .eq("id", auditId)
+
+  if (!error) {
+    return
+  }
+
+  if (isMissingAIInsightsColumn(error.message)) {
+    console.warn(
+      "ai_insights column is missing on audits; continuing without persisted AI insights."
+    )
+
+    return
+  }
+
+  console.error(
+    "Failed to persist AI insights:",
+    error
+  )
+}
+
+type AuditForInsights = {
+  auditId?: string | null
+  crawledPages?: { seoIssues?: string[] }[]
+  siteSummary?: {
+    averageSeoScore?: number
+    totalIssues?: number
+  }
+  isSlow?: boolean
+  durationMs?: number | null
+  failureReason?: string | null
+}
+
+/**
+ * Generates AI insights for a completed audit and persists them. Shared
+ * by every code path that produces a successful audit (manual analyze
+ * requests and the scheduled-audit cron job) so insights are never
+ * generated for one path and silently skipped for another.
+ */
+export async function generateAndPersistAuditInsights(
+  auditData: AuditForInsights
+): Promise<AIInsights | null> {
+  try {
+    const topIssues =
+      (auditData.crawledPages || [])
+        .flatMap(
+          (page) => page.seoIssues || []
+        )
+        .filter(
+          (issue, index, issues) =>
+            issues.indexOf(issue) === index
+        )
+
+    const seoScore =
+      auditData.siteSummary
+        ?.averageSeoScore ?? 0
+
+    const totalIssues =
+      auditData.siteSummary
+        ?.totalIssues ?? 0
+
+    const healthStatus =
+      seoScore >= 85
+        ? "Stable"
+        : seoScore >= 70
+          ? "Warning"
+          : "Critical"
+
+    const aiInsights =
+      await generateAIInsights({
+        seoScore,
+        healthStatus,
+        totalIssues,
+        topIssues,
+        regressions: [],
+        detectedThemes: [],
+        crawlDiagnostics: {
+          slow: auditData.isSlow ?? false,
+          durationMs:
+            auditData.durationMs ?? undefined,
+          failureReason:
+            auditData.failureReason ?? null
+        }
+      })
+
+    await persistAIInsights(
+      auditData.auditId,
+      aiInsights
+    )
+
+    return aiInsights
+  } catch (error) {
+    console.error(
+      "AI insight generation failed:",
+      error
+    )
+
+    return null
   }
 }

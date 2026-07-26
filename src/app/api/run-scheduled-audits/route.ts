@@ -6,13 +6,22 @@ import {
   getRequestKey
 } from "@/utils/rateLimit"
 import { updateMonitoredWebsiteDiagnostics } from "@/utils/monitoredWebsiteDiagnostics"
+import { generateAndPersistAuditInsights } from "@/utils/aiCopilot"
 
 function isAuthorizedRequest(request: Request) {
   const cronSecret =
     process.env.CRON_SECRET
 
   if (!cronSecret) {
-    return true
+    if (process.env.NODE_ENV !== "production") {
+      return true
+    }
+
+    console.error(
+      "CRON_SECRET is not configured; refusing to run scheduled audits in production."
+    )
+
+    return false
   }
 
   const authorization =
@@ -108,6 +117,12 @@ export async function GET(request: Request) {
           await enqueueAudit(
             website.url
           )
+
+        if (auditResult.success) {
+          await generateAndPersistAuditInsights(
+            auditResult.data
+          )
+        }
 
         await updateMonitoredWebsiteDiagnostics({
           id: website.id,

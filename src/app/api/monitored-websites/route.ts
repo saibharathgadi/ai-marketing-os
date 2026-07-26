@@ -74,10 +74,15 @@ export async function GET() {
 
   if (response.error) {
 
+    console.error(
+      "Failed to list monitored websites:",
+      response.error
+    )
+
     return NextResponse.json(
       {
         success: false,
-        error: response.error.message
+        error: "Failed to load monitored websites."
       },
       {
         status: 500
@@ -142,10 +147,15 @@ export async function POST(
 
   if (insertResponse.error) {
 
+    console.error(
+      "Failed to create monitored website:",
+      insertResponse.error
+    )
+
     return NextResponse.json(
       {
         success: false,
-        error: insertResponse.error.message
+        error: "Failed to create monitored website."
       },
       {
         status: 500

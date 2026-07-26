@@ -2,7 +2,10 @@ import { analyzePage } from "./analyzer"
 import { analyzeTechnicalSeo } from "./technicalSeo"
 import { supabase } from "@/lib/supabase"
 import { generateAIRecommendations } from "./aiRecommendations"
-import { validateWebsiteUrl } from "./urlValidation"
+import {
+  fetchWithSsrfProtection,
+  validateWebsiteUrl
+} from "./urlValidation"
 
 type TechnicalSeoResult = Awaited<
   ReturnType<typeof analyzeTechnicalSeo>
@@ -335,8 +338,7 @@ async function loadPage(
 
   try {
 
-    const response = await fetch(url, {
-      redirect: "follow",
+    const response = await fetchWithSsrfProtection(url, {
       signal: controller.signal,
       headers: {
         "User-Agent":
