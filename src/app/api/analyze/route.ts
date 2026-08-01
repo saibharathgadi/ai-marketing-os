@@ -7,6 +7,18 @@ import {
 } from "@/utils/rateLimit"
 import { updateMonitoredWebsiteDiagnostics } from "@/utils/monitoredWebsiteDiagnostics"
 import { validateWebsiteUrl } from "@/utils/urlValidation"
+import { createClient } from "@/lib/supabase/server"
+import { getCurrentOrgId } from "@/utils/organizations"
+
+// A full site crawl (sitemap discovery + multi-level link following) can
+// legitimately take longer than the platform default; this opts into
+// generous headroom above the crawler's own ~45s internal time budget
+// (leaving room for AI insight generation afterward) rather than being
+// killed mid-crawl. Confirmed this project has Fluid Compute enabled,
+// which raises Hobby's max duration to 300s -- no cost difference for
+// setting a higher ceiling since billing is based on actual CPU time
+// used, not the timeout itself.
+export const maxDuration = 120
 
 export async function POST(
   req: Request
@@ -47,6 +59,24 @@ export async function POST(
 
     }
 
+    const supabase = await createClient()
+    const orgId = await getCurrentOrgId(supabase)
+
+    if (!orgId) {
+
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Authentication required."
+        },
+        {
+          status: 401
+        }
+      )
+
+    }
+
     let body: unknown
 
     try {
@@ -67,6 +97,15 @@ export async function POST(
       )
 
     }
+
+    const websiteIdInput =
+      (body as { websiteId?: unknown }).websiteId
+
+    const websiteId =
+      typeof websiteIdInput === "string" &&
+      websiteIdInput.trim()
+        ? websiteIdInput.trim()
+        : undefined
 
     const urlValidation =
       validateWebsiteUrl(
@@ -94,12 +133,18 @@ export async function POST(
 
     const result =
       await enqueueAudit(
-        urlValidation.url
+        urlValidation.url,
+        orgId
       )
 
     await updateMonitoredWebsiteDiagnostics({
+      id:
+        websiteId,
+
       url:
         urlValidation.url,
+
+      orgId,
 
       success:
         result.success,

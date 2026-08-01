@@ -1,15 +1,19 @@
 import { analyzePage } from "./analyzer"
 import { analyzeTechnicalSeo } from "./technicalSeo"
-import { supabase } from "@/lib/supabase"
+import { analyzeAnswerEngineSeo } from "./answerEngineSeo"
+import { createServiceClient } from "@/lib/supabase/service"
 import { generateAIRecommendations } from "./aiRecommendations"
 import {
   fetchWithSsrfProtection,
   validateWebsiteUrl
 } from "./urlValidation"
+import { isMissingColumnError } from "./schemaCompat"
+import { generateSiteSummary } from "./summary"
 
 type TechnicalSeoResult = Awaited<
   ReturnType<typeof analyzeTechnicalSeo>
->
+> &
+  Awaited<ReturnType<typeof analyzeAnswerEngineSeo>>
 
 type PageSnapshot = {
   finalUrl: string
@@ -48,6 +52,7 @@ type CrawledPage = ReturnType<typeof analyzePage> & {
 
 type AuditInsertPayload = {
   url: string
+  org_id: string
   average_score: number
   total_pages: number
   total_issues: number
@@ -62,10 +67,20 @@ type AuditInsertResult = {
   id: string
 }
 
-const defaultMaxPages = 6
-const defaultPageConcurrency = 2
+// Defaults aim for a genuinely complete audit of a typical small-to-mid
+// business site (not just the homepage + a handful of links) while
+// staying inside serverless function time limits (see maxDuration on the
+// routes that call crawlWebsite). timeBudgetMs is the hard safety net:
+// once elapsed, the crawl stops enqueueing new pages and persists
+// whatever was gathered, so a very large site degrades to "as complete
+// as we had time for" instead of failing outright.
+const defaultMaxPages = 60
+const defaultPageConcurrency = 5
+const defaultTimeBudgetMs = 45_000
 const maxHtmlBytes = 3_000_000
 const defaultSlowCrawlMs = 10_000
+const maxSitemapUrls = 500
+const maxNestedSitemaps = 5
 
 function getPositiveIntegerEnv(
   key: string,
@@ -85,20 +100,21 @@ function getPositiveIntegerEnv(
 }
 
 function getCrawlConfig() {
-  const maxPages =
-    getPositiveIntegerEnv(
-      "CRAWL_MAX_PAGES",
-      defaultMaxPages
-    )
-
   return {
-    maxPages,
-    maxInternalLinks:
-      Math.max(maxPages - 1, 0),
+    maxPages:
+      getPositiveIntegerEnv(
+        "CRAWL_MAX_PAGES",
+        defaultMaxPages
+      ),
     pageConcurrency:
       getPositiveIntegerEnv(
         "CRAWL_PAGE_CONCURRENCY",
         defaultPageConcurrency
+      ),
+    timeBudgetMs:
+      getPositiveIntegerEnv(
+        "CRAWL_TIME_BUDGET_MS",
+        defaultTimeBudgetMs
       ),
     slowCrawlMs:
       getPositiveIntegerEnv(
@@ -147,11 +163,115 @@ export function extractInternalLinks(
 
   }
 
-  return internalLinks.slice(
-    0,
-    getCrawlConfig().maxInternalLinks
+  return internalLinks
+
+}
+
+async function fetchTextWithTimeout(
+  url: string,
+  timeoutMs: number
+) {
+  const controller = new AbortController()
+  const timeout = setTimeout(
+    () => controller.abort(),
+    timeoutMs
   )
 
+  try {
+    const response = await fetchWithSsrfProtection(url, {
+      signal: controller.signal
+    })
+
+    if (!response.ok) {
+      return null
+    }
+
+    return await response.text()
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+/**
+ * Discovers the full set of known page URLs from sitemap.xml (following
+ * one level of sitemap-index nesting, capped) so a full audit isn't
+ * limited to whatever happens to be linked from the homepage. Best
+ * effort: sites without a sitemap simply fall back to pure link-crawling.
+ */
+async function discoverSitemapUrls(
+  baseUrl: string,
+  hostname: string
+): Promise<string[]> {
+  const origin = new URL(baseUrl).origin
+  const locPattern = /<loc>\s*([^<\s]+)\s*<\/loc>/gi
+
+  const rootXml = await fetchTextWithTimeout(
+    `${origin}/sitemap.xml`,
+    8000
+  )
+
+  if (!rootXml) {
+    return []
+  }
+
+  const rootLocs = [...rootXml.matchAll(locPattern)].map(
+    (match) => match[1]
+  )
+
+  const isSitemapIndex = /<sitemapindex\b/i.test(rootXml)
+
+  const pageUrls = new Set<string>()
+
+  if (!isSitemapIndex) {
+    for (const loc of rootLocs) {
+      pageUrls.add(loc)
+
+      if (pageUrls.size >= maxSitemapUrls) {
+        break
+      }
+    }
+
+    return [...pageUrls]
+  }
+
+  // Sitemap index: fetch a bounded number of child sitemaps and collect
+  // their <loc> entries instead (those are the actual page URLs).
+  const childSitemaps = rootLocs.slice(0, maxNestedSitemaps)
+
+  for (const childUrl of childSitemaps) {
+    let childHost: string
+
+    try {
+      childHost = new URL(childUrl).hostname
+    } catch {
+      continue
+    }
+
+    if (childHost !== hostname) {
+      continue
+    }
+
+    const childXml = await fetchTextWithTimeout(
+      childUrl,
+      8000
+    )
+
+    if (!childXml) {
+      continue
+    }
+
+    for (const match of childXml.matchAll(locPattern)) {
+      pageUrls.add(match[1])
+
+      if (pageUrls.size >= maxSitemapUrls) {
+        return [...pageUrls]
+      }
+    }
+  }
+
+  return [...pageUrls]
 }
 
 function normalizeUrlForComparison(url: string) {
@@ -446,6 +566,8 @@ async function createAuditRecord(
   payload: AuditInsertPayload
 ) {
 
+  const supabase = createServiceClient()
+
   const withTechnicalSeo =
     await supabase
       .from("audits")
@@ -457,16 +579,17 @@ async function createAuditRecord(
     return withTechnicalSeo.data as AuditInsertResult
   }
 
-  const message =
-    withTechnicalSeo.error.message.toLowerCase()
-
   const missingTechnicalSeoColumn =
-    message.includes("technical_seo") ||
-    message.includes("crawl_duration_ms") ||
-    message.includes("crawl_status") ||
-    message.includes("crawl_failure_reason") ||
-    message.includes("is_slow") ||
-    message.includes("schema cache")
+    isMissingColumnError(
+      withTechnicalSeo.error.message,
+      [
+        "technical_seo",
+        "crawl_duration_ms",
+        "crawl_status",
+        "crawl_failure_reason",
+        "is_slow"
+      ]
+    )
 
   if (!missingTechnicalSeoColumn) {
     throw new Error(
@@ -480,6 +603,7 @@ async function createAuditRecord(
 
   const fallbackPayload = {
     url: payload.url,
+    org_id: payload.org_id,
     average_score:
       payload.average_score,
     total_pages:
@@ -509,6 +633,8 @@ async function persistCrawledPages(
   auditId: string,
   crawledPages: CrawledPage[]
 ) {
+
+  const supabase = createServiceClient()
 
   const pagesToInsert =
     crawledPages.map((page) => ({
@@ -550,7 +676,10 @@ async function persistCrawledPages(
 
 }
 
-export async function crawlWebsite(url: string) {
+export async function crawlWebsite(
+  url: string,
+  orgId: string
+) {
 
   const startedAt = Date.now()
   const urlValidation =
@@ -625,11 +754,26 @@ export async function crawlWebsite(url: string) {
       homepageAnalysis
     )
 
-  const technicalSeo =
-    await analyzeTechnicalSeo(
-      homepage.html,
-      homepage.finalUrl
-    )
+  const [technicalSeoResult, answerEngineSeoResult] =
+    await Promise.all([
+      analyzeTechnicalSeo(
+        homepage.html,
+        homepage.finalUrl
+      ),
+      analyzeAnswerEngineSeo({
+        html: homepage.html,
+        text: homepage.text,
+        baseUrl: homepage.finalUrl,
+        h1s: homepage.h1s,
+        h2s: homepage.h2s,
+        h3s: homepage.h3s
+      })
+    ])
+
+  const technicalSeo: TechnicalSeoResult = {
+    ...technicalSeoResult,
+    ...answerEngineSeoResult
+  }
 
   const crawledPages: CrawledPage[] = [
     {
@@ -640,139 +784,178 @@ export async function crawlWebsite(url: string) {
     }
   ]
 
-  const internalLinks =
+  const homepageHostname =
+    new URL(homepage.finalUrl).hostname
+
+  const visited = new Set<string>([
+    normalizeUrlForComparison(homepage.finalUrl)
+  ])
+
+  const sitemapUrls =
+    await discoverSitemapUrls(
+      homepage.finalUrl,
+      homepageHostname
+    )
+
+  const homepageLinks =
     extractInternalLinks(
       homepage.links,
       homepage.finalUrl
     )
 
-  const crawlableLinks =
-    internalLinks.slice(
-      0,
-      Math.max(crawlConfig.maxPages - 1, 0)
-    )
+  const internalLinks = homepageLinks
 
-  const subPages =
-    await mapWithConcurrency(
-      crawlableLinks,
-      crawlConfig.pageConcurrency,
-      async (link) => {
+  const queue: string[] = []
 
-        try {
+  function enqueue(rawUrl: string) {
+    let normalized: string
 
-          console.log(
-            "Crawling:",
-            link
-          )
+    try {
+      const candidate = new URL(rawUrl)
 
-          const subPage =
-            await loadPage(link)
+      if (candidate.hostname !== homepageHostname) {
+        return
+      }
 
-          if (!subPage.success) {
+      normalized = normalizeUrlForComparison(
+        candidate.href
+      )
+    } catch {
+      return
+    }
+
+    if (visited.has(normalized)) {
+      return
+    }
+
+    visited.add(normalized)
+    queue.push(normalized)
+  }
+
+  for (const link of [...sitemapUrls, ...homepageLinks]) {
+    enqueue(link)
+  }
+
+  const deadlineAt =
+    startedAt + crawlConfig.timeBudgetMs
+
+  while (
+    queue.length > 0 &&
+    crawledPages.length < crawlConfig.maxPages &&
+    Date.now() < deadlineAt
+  ) {
+
+    const remainingPageBudget =
+      crawlConfig.maxPages - crawledPages.length
+
+    const batch =
+      queue.splice(
+        0,
+        Math.min(
+          crawlConfig.pageConcurrency,
+          remainingPageBudget
+        )
+      )
+
+    const batchResults =
+      await mapWithConcurrency(
+        batch,
+        crawlConfig.pageConcurrency,
+        async (link) => {
+
+          try {
 
             console.log(
-              "Skipping slow page:",
+              "Crawling:",
               link
+            )
+
+            const subPage =
+              await loadPage(link)
+
+            if (!subPage.success) {
+
+              console.log(
+                "Skipping page:",
+                link,
+                subPage.reason
+              )
+
+              return null
+
+            }
+
+            const analysis =
+              analyzePage({
+                title: subPage.page.title,
+                metaDescription:
+                  subPage.page.metaDescription,
+                h1s: subPage.page.h1s,
+                h2s: subPage.page.h2s,
+                h3s: subPage.page.h3s,
+                text: subPage.page.text,
+                totalLinks:
+                  subPage.page.links.length
+              })
+
+            const aiRecommendations =
+              await generateAIRecommendations(
+                analysis
+              )
+
+            return {
+              crawledPage: {
+                url: subPage.page.finalUrl || link,
+                ...analysis,
+                aiRecommendations
+              } as CrawledPage,
+              discoveredLinks:
+                extractInternalLinks(
+                  subPage.page.links,
+                  subPage.page.finalUrl
+                )
+            }
+
+          } catch (error) {
+
+            console.error(
+              "Error crawling page:",
+              link,
+              error
             )
 
             return null
 
           }
 
-          const analysis =
-            analyzePage({
-              title: subPage.page.title,
-              metaDescription:
-                subPage.page.metaDescription,
-              h1s: subPage.page.h1s,
-              h2s: subPage.page.h2s,
-              h3s: subPage.page.h3s,
-              text: subPage.page.text,
-              totalLinks:
-                subPage.page.links.length
-            })
-
-          const aiRecommendations =
-            await generateAIRecommendations(
-              analysis
-            )
-
-          return {
-            url: subPage.page.finalUrl || link,
-            ...analysis,
-            aiRecommendations
-          }
-
-        } catch (error) {
-
-          console.error(
-            "Error crawling page:",
-            link,
-            error
-          )
-
-          return null
-
         }
+      )
 
+    for (const result of batchResults) {
+
+      if (!result) {
+        continue
       }
-    )
 
-  crawledPages.push(
-    ...subPages.filter(
-      (page): page is CrawledPage =>
-        Boolean(page)
-    )
-  )
+      crawledPages.push(result.crawledPage)
 
-  const averageSeoScore =
-    Math.round(
-      crawledPages.reduce(
-        (acc, page) =>
-          acc + page.seoScore,
-        0
-      ) / crawledPages.length
-    )
+      if (Date.now() >= deadlineAt) {
+        continue
+      }
 
-  const totalIssues =
-    crawledPages.reduce(
-      (acc, page) =>
-        acc + page.seoIssues.length,
-      0
-    )
+      for (const discoveredLink of result.discoveredLinks) {
+        enqueue(discoveredLink)
+      }
 
-  const bestPage =
-    crawledPages.reduce(
-      (best, current) =>
-        current.seoScore >
-        best.seoScore
-          ? current
-          : best
-    )
-
-  const worstPage =
-    crawledPages.reduce(
-      (worst, current) =>
-        current.seoScore <
-        worst.seoScore
-          ? current
-          : worst
-    )
-
-  const siteSummary = {
-
-    totalPages:
-      crawledPages.length,
-
-    averageSeoScore,
-
-    totalIssues,
-
-    bestPage,
-
-    worstPage
+    }
 
   }
+
+  const siteSummary =
+    generateSiteSummary(crawledPages)
+
+  const { averageSeoScore, totalIssues } =
+    siteSummary
 
   let auditId: string | null = null
 
@@ -785,6 +968,7 @@ export async function crawlWebsite(url: string) {
     const auditData =
       await createAuditRecord({
         url: urlValidation.url,
+        org_id: orgId,
         average_score:
           averageSeoScore,
         total_pages:

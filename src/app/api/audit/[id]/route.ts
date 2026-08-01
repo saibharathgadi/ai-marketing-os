@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { supabase } from "@/lib/supabase"
+import { createClient } from "@/lib/supabase/server"
 
 export async function DELETE(
   request: Request,
@@ -11,6 +11,10 @@ export async function DELETE(
   const { id } =
     await context.params
 
+  const supabase = await createClient()
+
+  // RLS delete policies on crawled_pages/audits already restrict this
+  // to rows belonging to organizations the current user is a member of.
   const { error: crawledPagesError } =
     await supabase
       .from("crawled_pages")

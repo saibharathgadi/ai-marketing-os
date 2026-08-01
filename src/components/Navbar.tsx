@@ -1,12 +1,16 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { supabase } from "@/lib/supabase"
+import { usePathname, useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
+import { Button } from "@/components/ui/button"
 
 export default function Navbar() {
 
   const router = useRouter()
+  const pathname = usePathname()
+  const [supabase] = useState(createClient)
 
   async function handleLogout() {
 
@@ -14,6 +18,10 @@ export default function Navbar() {
 
     router.push("/login")
 
+  }
+
+  if (pathname === "/login") {
+    return null
   }
 
   return (
@@ -24,7 +32,7 @@ export default function Navbar() {
 
         <Link
           href="/"
-          className="text-xl font-bold"
+          className="text-xl font-bold bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent"
         >
           AI Marketing OS
         </Link>
@@ -33,24 +41,24 @@ export default function Navbar() {
 
           <Link
             href="/"
-            className="text-zinc-300 hover:text-white transition"
+            className="text-zinc-300 hover:text-white transition text-sm"
           >
             Audit Website
           </Link>
 
           <Link
             href="/dashboard"
-            className="text-zinc-300 hover:text-white transition"
+            className="text-zinc-300 hover:text-white transition text-sm"
           >
             Dashboard
           </Link>
 
-          <button
+          <Button
             onClick={handleLogout}
-            className="rounded-lg bg-white text-black px-4 py-2 text-sm font-semibold"
+            size="sm"
           >
             Logout
-          </button>
+          </Button>
 
         </nav>
 

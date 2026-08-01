@@ -1,11 +1,34 @@
 import Link from "next/link"
-import { supabase } from "@/lib/supabase"
+import type { Metadata } from "next"
+import { createClient } from "@/lib/supabase/server"
 import { formatLocalTimestamp } from "@/lib/date"
 import {
   analyzeSeoRegression,
   RegressionAlert,
   RegressionHealthStatus
 } from "@/utils/seoRegression"
+import AuditCopilotTabs, {
+  type AIInsights
+} from "@/components/AuditCopilotTabs"
+import { Card } from "@/components/ui/card"
+
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false
+  }
+}
+
+type EngineScore = {
+  score: number
+  issues: string[]
+}
+
+type TechnicalSeo = {
+  aeo?: EngineScore
+  aio?: EngineScore
+  geo?: EngineScore
+} | null
 
 type AuditRow = {
   id: string
@@ -14,6 +37,28 @@ type AuditRow = {
   total_pages: number
   total_issues: number
   created_at: string
+  technical_seo?: TechnicalSeo
+  ai_insights?: Record<string, unknown> | null
+}
+
+function HealthScoreCard({
+  label,
+  engine
+}: {
+  label: string
+  engine?: EngineScore
+}) {
+  return (
+    <Card className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
+      <p className="text-zinc-400 text-sm">{label}</p>
+      <h2 className="text-4xl font-bold mt-3 bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">
+        {typeof engine?.score === "number" ? engine.score : "—"}
+      </h2>
+      {!engine && (
+        <p className="text-xs text-zinc-600 mt-2">Not yet analyzed</p>
+      )}
+    </Card>
+  )
 }
 
 type CrawledPageRow = {
@@ -114,11 +159,15 @@ export default async function AuditDetailPage({
 
   const { id } = await params
 
+  const supabase = await createClient()
+
+  // RLS restricts every query below to audits/pages in organizations
+  // the current session's user belongs to.
   const auditQuery =
     supabase
       .from("audits")
       .select(
-        "id,url,average_score,total_pages,total_issues,created_at"
+        "id,url,average_score,total_pages,total_issues,created_at,technical_seo,ai_insights"
       )
       .eq("id", id)
       .single()
@@ -242,7 +291,34 @@ export default async function AuditDetailPage({
 
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-10">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-10">
+
+          <HealthScoreCard
+            label="SEO"
+            engine={{
+              score: currentAudit?.average_score ?? 0,
+              issues: []
+            }}
+          />
+
+          <HealthScoreCard
+            label="AEO"
+            engine={currentAudit?.technical_seo?.aeo}
+          />
+
+          <HealthScoreCard
+            label="AIO"
+            engine={currentAudit?.technical_seo?.aio}
+          />
+
+          <HealthScoreCard
+            label="GEO"
+            engine={currentAudit?.technical_seo?.geo}
+          />
+
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
 
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
 
@@ -372,6 +448,14 @@ export default async function AuditDetailPage({
           </div>
 
         </section>
+
+        {currentAudit?.ai_insights && (
+
+          <AuditCopilotTabs
+            aiInsights={currentAudit.ai_insights as AIInsights}
+          />
+
+        )}
 
         <div className="mt-10 space-y-8">
 

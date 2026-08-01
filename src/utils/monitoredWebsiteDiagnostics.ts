@@ -1,9 +1,18 @@
-import { supabase } from "@/lib/supabase"
+import { createServiceClient } from "@/lib/supabase/service"
 import type { CrawlFailureReason } from "./crawler"
+import { isMissingColumnError } from "./schemaCompat"
+
+const diagnosticsColumns = [
+  "last_failure_reason",
+  "last_audit_duration_ms",
+  "last_audit_status",
+  "last_audit_is_slow"
+]
 
 type DiagnosticsPayload = {
   id?: string
   url: string
+  orgId: string
   success: boolean
   failureReason?: CrawlFailureReason | null
   durationMs?: number
@@ -13,34 +22,23 @@ type DiagnosticsPayload = {
 function isMissingDiagnosticsColumn(
   message: string
 ) {
-  const normalized =
-    message.toLowerCase()
-
-  return (
-    normalized.includes(
-      "last_failure_reason"
-    ) ||
-    normalized.includes(
-      "last_audit_duration_ms"
-    ) ||
-    normalized.includes(
-      "last_audit_status"
-    ) ||
-    normalized.includes(
-      "last_audit_is_slow"
-    ) ||
-    normalized.includes("schema cache")
+  return isMissingColumnError(
+    message,
+    diagnosticsColumns
   )
 }
 
 export async function updateMonitoredWebsiteDiagnostics({
   id,
   url,
+  orgId,
   success,
   failureReason,
   durationMs,
   isSlow
 }: DiagnosticsPayload) {
+  const supabase = createServiceClient()
+
   const diagnosticsUpdate = {
     ...(success
       ? {
@@ -66,6 +64,7 @@ export async function updateMonitoredWebsiteDiagnostics({
     supabase
       .from("monitored_websites")
       .update(diagnosticsUpdate)
+      .eq("org_id", orgId)
 
   query = id
     ? query.eq("id", id)
@@ -99,6 +98,7 @@ export async function updateMonitoredWebsiteDiagnostics({
         last_audited_at:
           new Date().toISOString()
       })
+      .eq("org_id", orgId)
 
   fallbackQuery = id
     ? fallbackQuery.eq("id", id)

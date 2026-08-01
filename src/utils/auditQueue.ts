@@ -7,6 +7,8 @@ import { validateWebsiteUrl } from "./urlValidation"
 type AuditQueueJob = {
   id: string
   url: string
+  orgId: string
+  lockKey: string
   enqueuedAt: number
   startedAt?: number
   resolve: (
@@ -146,7 +148,7 @@ function completeJob(
 
   state.activeCount =
     Math.max(state.activeCount - 1, 0)
-  state.activeUrls.delete(job.url)
+  state.activeUrls.delete(job.lockKey)
   job.resolve(result)
   processQueue()
 }
@@ -156,7 +158,7 @@ async function runJob(job: AuditQueueJob) {
 
   try {
     const result =
-      await crawlWebsite(job.url)
+      await crawlWebsite(job.url, job.orgId)
 
     if (!result.success) {
       completeJob(job, {
@@ -225,7 +227,8 @@ function processQueue() {
 }
 
 export async function enqueueAudit(
-  url: string
+  url: string,
+  orgId: string
 ): Promise<QueuedAuditResult> {
   const urlValidation =
     validateWebsiteUrl(url)
@@ -245,7 +248,14 @@ export async function enqueueAudit(
   const normalizedUrl =
     urlValidation.url
 
-  if (state.activeUrls.has(normalizedUrl)) {
+  // Locking is per (org, url) — two different organizations auditing
+  // the same public URL at the same time isn't a race condition once
+  // audits are org-scoped, only two crawls of the same URL within the
+  // same org are.
+  const lockKey =
+    `${orgId}:${normalizedUrl}`
+
+  if (state.activeUrls.has(lockKey)) {
     return {
       success: false,
       status: "locked",
@@ -274,7 +284,7 @@ export async function enqueueAudit(
     }
   }
 
-  state.activeUrls.add(normalizedUrl)
+  state.activeUrls.add(lockKey)
 
   return new Promise((resolve) => {
     state.queue.push({
@@ -283,6 +293,8 @@ export async function enqueueAudit(
           .toString(36)
           .slice(2)}`,
       url: normalizedUrl,
+      orgId,
+      lockKey,
       enqueuedAt: Date.now(),
       resolve
     })

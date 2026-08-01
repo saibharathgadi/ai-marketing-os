@@ -33,6 +33,13 @@ function isAuthorizedRequest(request: Request) {
   )
 }
 
+// This route sweeps every monitored website sequentially (each with its
+// own ~45s crawl budget), so it needs headroom for multiple sites, not
+// just one. 300s is Hobby's max (with Fluid Compute, confirmed enabled
+// on this project) -- comfortably covers a handful of monitored sites
+// per organization.
+export const maxDuration = 300
+
 export async function GET(request: Request) {
 
   if (!isAuthorizedRequest(request)) {

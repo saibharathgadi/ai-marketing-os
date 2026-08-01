@@ -4,15 +4,19 @@ import {
   getRequestKey
 } from "@/utils/rateLimit"
 import { runMonitoredWebsiteAudits } from "@/utils/runMonitoredWebsiteAudits"
+import { createClient } from "@/lib/supabase/server"
+import { getCurrentOrgId } from "@/utils/organizations"
 
 /**
  * Interactive counterpart to /api/run-scheduled-audits. That endpoint is
- * gated by CRON_SECRET for automated/external callers; this one is what
- * the dashboard's "Run Scheduled Audits" button calls directly from the
- * browser, so it deliberately does not require the cron secret (a
- * browser fetch can't safely hold one). Rate limiting is the only
- * abuse guard here until real user authentication exists.
+ * gated by CRON_SECRET for automated/external callers and sweeps every
+ * organization; this one is what the dashboard's "Run Scheduled Audits"
+ * button calls, scoped to the current user's own organization only.
  */
+// Same reasoning as run-scheduled-audits: sweeps multiple monitored
+// sites sequentially, so needs headroom beyond a single crawl's budget.
+export const maxDuration = 300
+
 export async function POST(request: Request) {
 
   const rateLimit =
@@ -48,8 +52,23 @@ export async function POST(request: Request) {
 
   try {
 
+    const supabase = await createClient()
+    const orgId = await getCurrentOrgId(supabase)
+
+    if (!orgId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Authentication required."
+        },
+        {
+          status: 401
+        }
+      )
+    }
+
     const result =
-      await runMonitoredWebsiteAudits()
+      await runMonitoredWebsiteAudits(orgId)
 
     if (!result.success) {
 
