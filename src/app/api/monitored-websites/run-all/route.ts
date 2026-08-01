@@ -13,7 +13,9 @@ import { getCurrentOrgId } from "@/utils/organizations"
  * organization; this one is what the dashboard's "Run Scheduled Audits"
  * button calls, scoped to the current user's own organization only.
  */
-export const maxDuration = 60
+// Same reasoning as run-scheduled-audits: sweeps multiple monitored
+// sites sequentially, so needs headroom beyond a single crawl's budget.
+export const maxDuration = 300
 
 export async function POST(request: Request) {
 
