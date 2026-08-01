@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { supabase } from "@/lib/supabase"
+import { createClient } from "@/lib/supabase/server"
 import { generatePDFReport } from "@/utils/pdfReport"
 import {
   sendSeoReportEmail,
@@ -89,6 +89,10 @@ export async function POST(
     )
   }
 
+  const supabase = await createClient()
+
+  // RLS restricts this to audits in organizations the current user
+  // belongs to, same as GET /api/report/[id].
   const { data: audit, error: auditError } =
     await supabase
       .from("audits")

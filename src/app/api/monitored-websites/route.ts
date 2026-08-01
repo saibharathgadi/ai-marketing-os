@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server"
-import { supabase } from "@/lib/supabase"
+import { createClient } from "@/lib/supabase/server"
+import { getCurrentOrgId } from "@/utils/organizations"
 import { validateWebsiteUrl } from "@/utils/urlValidation"
 import { validateReportRecipient } from "@/utils/emailReport"
 import { isMissingColumnError } from "@/utils/schemaCompat"
+import {
+  checkRateLimit,
+  getRequestKey
+} from "@/utils/rateLimit"
 
 const monitoredWebsiteSelect =
   "id,url,last_audited_at,last_failure_reason,last_audit_duration_ms,last_audit_status,last_audit_is_slow,notification_email,created_at"
@@ -32,6 +37,10 @@ function isMissingDiagnosticsColumn(
 
 export async function GET() {
 
+  const supabase = await createClient()
+
+  // No manual org_id filter needed here — RLS restricts the result set
+  // to rows in organizations the current session's user belongs to.
   const response =
     await supabase
       .from("monitored_websites")
@@ -102,6 +111,52 @@ export async function POST(
   request: Request
 ) {
 
+  const rateLimit =
+    checkRateLimit({
+      key: getRequestKey(
+        request,
+        "monitored-websites-create"
+      ),
+      limit: 10,
+      windowMs: 60_000
+    })
+
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "Too many requests. Please try again shortly.",
+        retryAfterSeconds:
+          rateLimit.retryAfterSeconds
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After":
+            String(
+              rateLimit.retryAfterSeconds
+            )
+        }
+      }
+    )
+  }
+
+  const supabase = await createClient()
+  const orgId = await getCurrentOrgId(supabase)
+
+  if (!orgId) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Authentication required."
+      },
+      {
+        status: 401
+      }
+    )
+  }
+
   let body: unknown
 
   try {
@@ -167,6 +222,7 @@ export async function POST(
       .from("monitored_websites")
       .insert({
         url: urlValidation.url,
+        org_id: orgId,
         notification_email: notificationEmail
       })
       .select(insertSelect)
@@ -183,7 +239,8 @@ export async function POST(
       await supabase
         .from("monitored_websites")
         .insert({
-          url: urlValidation.url
+          url: urlValidation.url,
+          org_id: orgId
         })
         .select(fallbackMonitoredWebsiteSelect)
         .single()
@@ -196,13 +253,22 @@ export async function POST(
       insertResponse.error
     )
 
+    const isDuplicate =
+      insertResponse.error.message
+        .toLowerCase()
+        .includes("duplicate")
+
     return NextResponse.json(
       {
         success: false,
-        error: "Failed to create monitored website."
+        error:
+          isDuplicate
+            ? "This website is already being monitored."
+            : "Failed to create monitored website."
       },
       {
-        status: 500
+        status:
+          isDuplicate ? 409 : 500
       }
     )
 

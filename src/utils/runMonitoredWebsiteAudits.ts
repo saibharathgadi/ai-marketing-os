@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase"
+import { createServiceClient } from "@/lib/supabase/service"
 import { enqueueAudit } from "./auditQueue"
 import { updateMonitoredWebsiteDiagnostics } from "./monitoredWebsiteDiagnostics"
 import { generateAndPersistAuditInsights } from "./aiCopilot"
@@ -9,6 +9,7 @@ import { isMissingColumnError } from "./schemaCompat"
 type MonitoredWebsiteRow = {
   id: string
   url: string
+  org_id: string
   notification_email?: string | null
 }
 
@@ -22,6 +23,7 @@ const auditHistorySelect =
  * audit itself having failed.
  */
 async function notifyIfRegressed(
+  supabase: ReturnType<typeof createServiceClient>,
   website: MonitoredWebsiteRow
 ) {
   if (!website.notification_email) {
@@ -35,6 +37,7 @@ async function notifyIfRegressed(
         .from("audits")
         .select(auditHistorySelect)
         .eq("url", website.url)
+        .eq("org_id", website.org_id)
         .order("created_at", {
           ascending: false
         })
@@ -106,17 +109,38 @@ export type RunMonitoredWebsiteAuditsResult =
     }
 
 /**
- * Runs an audit for every saved monitored website. Shared by the
- * cron-secret-protected scheduled endpoint and the interactive
- * "Run Scheduled Audits" dashboard button, so the two call sites can't
- * drift out of sync with each other.
+ * Runs an audit for every saved monitored website, optionally scoped to
+ * one organization. Shared by the cron-secret-protected scheduled
+ * endpoint (no orgId — sweeps every organization) and the interactive
+ * "Run Scheduled Audits" dashboard button (orgId — only that user's own
+ * organization), so the two call sites can't drift out of sync.
+ *
+ * Uses the service-role client throughout: this is trusted system code
+ * that already had its caller's authorization checked (session + org
+ * membership for the button, CRON_SECRET for the scheduler) before
+ * being invoked, so it intentionally bypasses RLS rather than needing
+ * a session token threaded through the whole crawl pipeline.
  */
-export async function runMonitoredWebsiteAudits(): Promise<RunMonitoredWebsiteAuditsResult> {
+export async function runMonitoredWebsiteAudits(
+  orgId?: string
+): Promise<RunMonitoredWebsiteAuditsResult> {
+
+  const supabase = createServiceClient()
+
+  let query =
+    supabase
+      .from("monitored_websites")
+      .select("id,url,org_id,notification_email")
+
+  if (orgId) {
+    query = query.eq("org_id", orgId)
+  }
 
   let { data: websites, error } =
-    await supabase
-      .from("monitored_websites")
-      .select("id,url,notification_email")
+    await query as {
+      data: MonitoredWebsiteRow[] | null
+      error: { message: string } | null
+    }
 
   if (
     error &&
@@ -125,10 +149,21 @@ export async function runMonitoredWebsiteAudits(): Promise<RunMonitoredWebsiteAu
       ["notification_email"]
     )
   ) {
-    ({ data: websites, error } =
-      await supabase
+    let fallbackQuery =
+      supabase
         .from("monitored_websites")
-        .select("id,url"))
+        .select("id,url,org_id")
+
+    if (orgId) {
+      fallbackQuery =
+        fallbackQuery.eq("org_id", orgId)
+    }
+
+    ({ data: websites, error } =
+      await fallbackQuery as unknown as {
+        data: MonitoredWebsiteRow[] | null
+        error: { message: string } | null
+      })
   }
 
   if (error) {
@@ -150,19 +185,26 @@ export async function runMonitoredWebsiteAudits(): Promise<RunMonitoredWebsiteAu
       )
 
       const auditResult =
-        await enqueueAudit(website.url)
+        await enqueueAudit(
+          website.url,
+          website.org_id
+        )
 
       if (auditResult.success) {
         await generateAndPersistAuditInsights(
           auditResult.data
         )
 
-        await notifyIfRegressed(website)
+        await notifyIfRegressed(
+          supabase,
+          website
+        )
       }
 
       await updateMonitoredWebsiteDiagnostics({
         id: website.id,
         url: website.url,
+        orgId: website.org_id,
         success: auditResult.success,
         failureReason:
           auditResult.success

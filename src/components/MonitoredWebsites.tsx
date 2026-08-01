@@ -220,6 +220,7 @@ export default function MonitoredWebsites({
   }
 
   async function handleRunAudit(
+    websiteId: string,
     websiteUrl: string
   ) {
 
@@ -238,7 +239,8 @@ export default function MonitoredWebsites({
           },
 
           body: JSON.stringify({
-            url: websiteUrl
+            url: websiteUrl,
+            websiteId
           })
 
         })
@@ -503,6 +505,7 @@ export default function MonitoredWebsites({
                 <button
                   onClick={() =>
                     handleRunAudit(
+                      website.id,
                       website.url
                     )
                   }

@@ -1,12 +1,25 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { supabase } from "@/lib/supabase"
+import { createClient } from "@/lib/supabase/client"
 import { formatLocalTimestamp } from "@/lib/date"
 import DashboardCharts from "@/components/DashboardCharts"
 import MonitoredWebsites from "@/components/MonitoredWebsites"
 import { isMissingColumnError } from "@/utils/schemaCompat"
+import { Badge } from "@/components/ui/badge"
+import { Card } from "@/components/ui/card"
+
+type EngineScore = {
+  score: number
+  issues: string[]
+}
+
+type TechnicalSeo = {
+  aeo?: EngineScore
+  aio?: EngineScore
+  geo?: EngineScore
+} | null
 
 type Audit = {
   id: string
@@ -19,11 +32,25 @@ type Audit = {
   crawl_failure_reason?: string | null
   crawl_status?: string | null
   is_slow?: boolean | null
+  technical_seo?: TechnicalSeo
   ai_insights?: {
     executiveSummary?: string
     weeklyFocus?: string
     priorityActions?: {
       title: string
+    }[]
+    contentIdeas?: {
+      title: string
+      description: string
+      type: "blog" | "social" | "landing-page"
+    }[]
+    socialIdeas?: {
+      platform: string
+      idea: string
+    }[]
+    adCampaigns?: {
+      name: string
+      objective: string
     }[]
   } | null
 }
@@ -43,7 +70,7 @@ const defaultQueueMetrics: QueueMetrics = {
 }
 
 const auditSelect =
-  "id,url,average_score,total_pages,total_issues,created_at,crawl_duration_ms,crawl_failure_reason,crawl_status,is_slow,ai_insights"
+  "id,url,average_score,total_pages,total_issues,created_at,crawl_duration_ms,crawl_failure_reason,crawl_status,is_slow,ai_insights,technical_seo"
 
 const fallbackAuditSelect =
   "id,url,average_score,total_pages,total_issues,created_at"
@@ -58,8 +85,49 @@ function isMissingDiagnosticsColumn(
       "crawl_failure_reason",
       "crawl_status",
       "is_slow",
-      "ai_insights"
+      "ai_insights",
+      "technical_seo"
     ]
+  )
+}
+
+function EngineScorePill({
+  label,
+  engine
+}: {
+  label: string
+  engine?: EngineScore
+}) {
+  if (!engine || typeof engine.score !== "number") {
+    return (
+      <Badge variant="outline" className="text-zinc-500">
+        {label}: n/a
+      </Badge>
+    )
+  }
+
+  const variant =
+    engine.score >= 80
+      ? "default"
+      : engine.score >= 60
+        ? "secondary"
+        : "destructive"
+
+  return (
+    <Badge variant={variant}>
+      {label}: {engine.score}
+    </Badge>
+  )
+}
+
+function average(values: number[]) {
+  if (values.length === 0) {
+    return null
+  }
+
+  return Math.round(
+    values.reduce((sum, value) => sum + value, 0) /
+      values.length
   )
 }
 
@@ -96,6 +164,8 @@ function AuditCardSkeleton() {
 
 export default function DashboardClient() {
 
+  const [supabase] = useState(createClient)
+
   const [audits, setAudits] =
     useState<Audit[]>([])
 
@@ -105,65 +175,35 @@ export default function DashboardClient() {
   const [queueMetrics, setQueueMetrics] =
     useState(defaultQueueMetrics)
 
-  useEffect(() => {
+  const loadDiagnostics = useCallback(
+    async () => {
+      try {
+        const response =
+          await fetch("/api/diagnostics")
+        const result =
+          await response.json()
 
-    loadAudits()
-
-  }, [])
-
-  useEffect(() => {
-
-    function pollIfVisible() {
-      if (document.visibilityState === "visible") {
-        loadDiagnostics()
+        if (result.success) {
+          setQueueMetrics({
+            queued:
+              result.queue?.queued || 0,
+            running:
+              result.queue?.running || 0,
+            failed:
+              result.queue?.failed || 0,
+            failedByReason:
+              result.queue?.failedByReason || {}
+          })
+        }
+      } catch (error) {
+        console.error(error)
       }
-    }
+    },
+    []
+  )
 
-    const interval =
-      window.setInterval(pollIfVisible, 2000)
-
-    loadDiagnostics()
-
-    document.addEventListener(
-      "visibilitychange",
-      pollIfVisible
-    )
-
-    return () => {
-      window.clearInterval(interval)
-      document.removeEventListener(
-        "visibilitychange",
-        pollIfVisible
-      )
-    }
-
-  }, [])
-
-  async function loadDiagnostics() {
-    try {
-      const response =
-        await fetch("/api/diagnostics")
-      const result =
-        await response.json()
-
-      if (result.success) {
-        setQueueMetrics({
-          queued:
-            result.queue?.queued || 0,
-          running:
-            result.queue?.running || 0,
-          failed:
-            result.queue?.failed || 0,
-          failedByReason:
-            result.queue?.failedByReason || {}
-        })
-      }
-    } catch (error) {
-      console.error(error)
-    }
-  }
-
-  async function loadAudits() {
+  const loadAudits = useCallback(
+    async () => {
 
     try {
 
@@ -233,6 +273,10 @@ export default function DashboardClient() {
             ai_insights:
               "ai_insights" in audit
                 ? audit.ai_insights
+                : null,
+            technical_seo:
+              "technical_seo" in audit
+                ? audit.technical_seo
                 : null
           })
         )
@@ -248,7 +292,95 @@ export default function DashboardClient() {
 
     }
 
-  }
+    },
+    [supabase]
+  )
+
+  useEffect(() => {
+
+    // setState only happens after loadAudits' internal `await` resolves,
+    // never synchronously within this effect — fetch-on-mount, not a
+    // cascading-render risk.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadAudits()
+
+  }, [loadAudits])
+
+  useEffect(() => {
+
+    function pollIfVisible() {
+      if (document.visibilityState === "visible") {
+        loadDiagnostics()
+      }
+    }
+
+    const interval =
+      window.setInterval(pollIfVisible, 2000)
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- see note above
+    loadDiagnostics()
+
+    document.addEventListener(
+      "visibilitychange",
+      pollIfVisible
+    )
+
+    return () => {
+      window.clearInterval(interval)
+      document.removeEventListener(
+        "visibilitychange",
+        pollIfVisible
+      )
+    }
+
+  }, [loadDiagnostics])
+
+  const healthAverages = useMemo(() => {
+    const seoScores = audits.map((audit) => audit.average_score)
+
+    const aeoScores = audits
+      .map((audit) => audit.technical_seo?.aeo?.score)
+      .filter((score): score is number => typeof score === "number")
+
+    const aioScores = audits
+      .map((audit) => audit.technical_seo?.aio?.score)
+      .filter((score): score is number => typeof score === "number")
+
+    const geoScores = audits
+      .map((audit) => audit.technical_seo?.geo?.score)
+      .filter((score): score is number => typeof score === "number")
+
+    return {
+      seo: average(seoScores),
+      aeo: average(aeoScores),
+      aio: average(aioScores),
+      geo: average(geoScores)
+    }
+  }, [audits])
+
+  const latestIdeas = useMemo(() => {
+    const withInsights = audits.find(
+      (audit) =>
+        audit.ai_insights &&
+        ((audit.ai_insights.contentIdeas?.length ?? 0) > 0 ||
+          (audit.ai_insights.socialIdeas?.length ?? 0) > 0 ||
+          (audit.ai_insights.adCampaigns?.length ?? 0) > 0)
+    )
+
+    if (!withInsights) {
+      return null
+    }
+
+    return {
+      auditId: withInsights.id,
+      url: withInsights.url,
+      blogIdea: withInsights.ai_insights?.contentIdeas?.find(
+        (idea) => idea.type === "blog"
+      ),
+      socialIdea: withInsights.ai_insights?.socialIdeas?.[0],
+      adCampaign: withInsights.ai_insights?.adCampaigns?.[0]
+    }
+  }, [audits])
 
   async function handleDelete(
     auditId: string
@@ -327,6 +459,110 @@ export default function DashboardClient() {
           </Link>
 
         </div>
+
+        {!loading && audits.length > 0 && (
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-10">
+
+            {[
+              { label: "SEO", value: healthAverages.seo },
+              { label: "AEO", value: healthAverages.aeo },
+              { label: "AIO", value: healthAverages.aio },
+              { label: "GEO", value: healthAverages.geo }
+            ].map((metric) => (
+
+              <Card
+                key={metric.label}
+                className="border border-zinc-800 bg-zinc-900 px-6 py-5"
+              >
+
+                <p className="text-zinc-500 text-xs uppercase tracking-wide">
+                  Avg {metric.label}
+                </p>
+
+                <h3 className="text-3xl font-bold mt-2 bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">
+                  {metric.value ?? "—"}
+                </h3>
+
+              </Card>
+
+            ))}
+
+          </div>
+
+        )}
+
+        {latestIdeas && (
+
+          <Card className="mt-8 border border-zinc-800 bg-zinc-900 p-6">
+
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+
+              <h2 className="text-lg font-semibold">
+                Marketing Ideas — from your latest audit
+              </h2>
+
+              <Link
+                href={`/audit/${latestIdeas.auditId}`}
+                className="text-sm text-violet-400 hover:text-violet-300"
+              >
+                View full breakdown →
+              </Link>
+
+            </div>
+
+            <p className="text-zinc-500 text-sm mt-1 break-all">
+              {latestIdeas.url}
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-5">
+
+              {latestIdeas.blogIdea && (
+
+                <div className="rounded-xl bg-zinc-950 border border-zinc-800 p-4">
+                  <Badge variant="secondary">Blog</Badge>
+                  <p className="text-sm font-medium mt-2">
+                    {latestIdeas.blogIdea.title}
+                  </p>
+                  <p className="text-xs text-zinc-500 mt-1">
+                    {latestIdeas.blogIdea.description}
+                  </p>
+                </div>
+
+              )}
+
+              {latestIdeas.socialIdea && (
+
+                <div className="rounded-xl bg-zinc-950 border border-zinc-800 p-4">
+                  <Badge variant="secondary">
+                    {latestIdeas.socialIdea.platform}
+                  </Badge>
+                  <p className="text-sm mt-2">
+                    {latestIdeas.socialIdea.idea}
+                  </p>
+                </div>
+
+              )}
+
+              {latestIdeas.adCampaign && (
+
+                <div className="rounded-xl bg-zinc-950 border border-zinc-800 p-4">
+                  <Badge variant="secondary">Ad Campaign</Badge>
+                  <p className="text-sm font-medium mt-2">
+                    {latestIdeas.adCampaign.name}
+                  </p>
+                  <p className="text-xs text-zinc-500 mt-1">
+                    {latestIdeas.adCampaign.objective}
+                  </p>
+                </div>
+
+              )}
+
+            </div>
+
+          </Card>
+
+        )}
 
         <DashboardCharts
           audits={audits}
@@ -446,7 +682,22 @@ export default function DashboardClient() {
 
                 </div>
 
-                <p className="text-zinc-500 text-sm mt-8">
+                <div className="flex flex-wrap gap-2 mt-6">
+                  <EngineScorePill
+                    label="AEO"
+                    engine={audit.technical_seo?.aeo}
+                  />
+                  <EngineScorePill
+                    label="AIO"
+                    engine={audit.technical_seo?.aio}
+                  />
+                  <EngineScorePill
+                    label="GEO"
+                    engine={audit.technical_seo?.geo}
+                  />
+                </div>
+
+                <p className="text-zinc-500 text-sm mt-4">
                   {formatLocalTimestamp(
                     audit.created_at
                   )}

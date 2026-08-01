@@ -33,6 +33,8 @@ function isAuthorizedRequest(request: Request) {
   )
 }
 
+export const maxDuration = 60
+
 export async function GET(request: Request) {
 
   if (!isAuthorizedRequest(request)) {

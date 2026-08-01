@@ -7,6 +7,15 @@ import {
 } from "@/utils/rateLimit"
 import { updateMonitoredWebsiteDiagnostics } from "@/utils/monitoredWebsiteDiagnostics"
 import { validateWebsiteUrl } from "@/utils/urlValidation"
+import { createClient } from "@/lib/supabase/server"
+import { getCurrentOrgId } from "@/utils/organizations"
+
+// A full site crawl (sitemap discovery + multi-level link following) can
+// legitimately take longer than the platform default; this opts into
+// the longest duration the current plan allows rather than being killed
+// mid-crawl. crawler.ts's own internal time budget still stops the
+// crawl safely before this ceiling.
+export const maxDuration = 60
 
 export async function POST(
   req: Request
@@ -47,6 +56,24 @@ export async function POST(
 
     }
 
+    const supabase = await createClient()
+    const orgId = await getCurrentOrgId(supabase)
+
+    if (!orgId) {
+
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Authentication required."
+        },
+        {
+          status: 401
+        }
+      )
+
+    }
+
     let body: unknown
 
     try {
@@ -67,6 +94,15 @@ export async function POST(
       )
 
     }
+
+    const websiteIdInput =
+      (body as { websiteId?: unknown }).websiteId
+
+    const websiteId =
+      typeof websiteIdInput === "string" &&
+      websiteIdInput.trim()
+        ? websiteIdInput.trim()
+        : undefined
 
     const urlValidation =
       validateWebsiteUrl(
@@ -94,12 +130,18 @@ export async function POST(
 
     const result =
       await enqueueAudit(
-        urlValidation.url
+        urlValidation.url,
+        orgId
       )
 
     await updateMonitoredWebsiteDiagnostics({
+      id:
+        websiteId,
+
       url:
         urlValidation.url,
+
+      orgId,
 
       success:
         result.success,

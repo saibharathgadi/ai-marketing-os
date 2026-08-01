@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase"
+import { createServiceClient } from "@/lib/supabase/service"
 import type { CrawlFailureReason } from "./crawler"
 import { isMissingColumnError } from "./schemaCompat"
 
@@ -12,6 +12,7 @@ const diagnosticsColumns = [
 type DiagnosticsPayload = {
   id?: string
   url: string
+  orgId: string
   success: boolean
   failureReason?: CrawlFailureReason | null
   durationMs?: number
@@ -30,11 +31,14 @@ function isMissingDiagnosticsColumn(
 export async function updateMonitoredWebsiteDiagnostics({
   id,
   url,
+  orgId,
   success,
   failureReason,
   durationMs,
   isSlow
 }: DiagnosticsPayload) {
+  const supabase = createServiceClient()
+
   const diagnosticsUpdate = {
     ...(success
       ? {
@@ -60,6 +64,7 @@ export async function updateMonitoredWebsiteDiagnostics({
     supabase
       .from("monitored_websites")
       .update(diagnosticsUpdate)
+      .eq("org_id", orgId)
 
   query = id
     ? query.eq("id", id)
@@ -93,6 +98,7 @@ export async function updateMonitoredWebsiteDiagnostics({
         last_audited_at:
           new Date().toISOString()
       })
+      .eq("org_id", orgId)
 
   fallbackQuery = id
     ? fallbackQuery.eq("id", id)

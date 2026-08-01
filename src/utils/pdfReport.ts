@@ -13,7 +13,50 @@ type TechnicalSeoResult = {
   openGraph: boolean
   twitterCards: boolean
   schemaMarkup: boolean
+  aeo?: { score: number }
+  aio?: { score: number }
+  geo?: { score: number }
 }
+
+// Loose/partial on purpose: older audits predate some or all of these
+// fields, and this report must render something reasonable regardless
+// of exactly which fields a given audit's ai_insights happens to have.
+type AiInsightsReportData = {
+  executiveSummary?: string
+  weeklyFocus?: string
+  priorityActions?: { title: string; reason: string; severity: string }[]
+  rootCauseSummary?: { issue: string; type: string; severity: string }[]
+  keywordClusters?: {
+    cluster: string
+    exampleKeywords: string[]
+    funnelStage: string
+    serpTarget: string
+  }[]
+  blogSeries?: {
+    seriesTitle: string
+    posts: { title: string }[]
+  }[]
+  socialSeries?: {
+    platform: string
+    seriesTitle: string
+  }[]
+  adCampaigns?: {
+    name: string
+    objective: string
+    channels: string[]
+  }[]
+  roadmap90Day?: {
+    zeroToTwoWeeks: string[]
+    thirtyDays: string[]
+    sixtyToNinetyDays: string[]
+  }
+  kpiFramework?: {
+    area: string
+    metric: string
+    baseline: string
+    target: string
+  }[]
+} | null
 
 type AuditReportRow = {
   url: string
@@ -22,6 +65,7 @@ type AuditReportRow = {
   total_issues: number
   created_at?: string | null
   technical_seo?: TechnicalSeoResult | string | null
+  ai_insights?: AiInsightsReportData
 }
 
 type CrawledPageReportRow = {
@@ -191,14 +235,43 @@ function parseTechnicalSeo(
     return null
   }
 
+  const engineScore = (value: unknown) => {
+    if (
+      value &&
+      typeof value === "object" &&
+      typeof (value as { score?: unknown }).score === "number"
+    ) {
+      return { score: (value as { score: number }).score }
+    }
+
+    return undefined
+  }
+
   return {
     robotsTxt: Boolean(parsed.robotsTxt),
     sitemap: Boolean(parsed.sitemap),
     canonical: Boolean(parsed.canonical),
     openGraph: Boolean(parsed.openGraph),
     twitterCards: Boolean(parsed.twitterCards),
-    schemaMarkup: Boolean(parsed.schemaMarkup)
+    schemaMarkup: Boolean(parsed.schemaMarkup),
+    aeo: engineScore(parsed.aeo),
+    aio: engineScore(parsed.aio),
+    geo: engineScore(parsed.geo)
   }
+}
+
+function parseAiInsights(
+  value: AiInsightsReportData | string | null | undefined
+): AiInsightsReportData {
+  if (!value) {
+    return null
+  }
+
+  if (typeof value === "string") {
+    return (parseJsonObject(value) as AiInsightsReportData) ?? null
+  }
+
+  return value
 }
 
 function parseJsonObject(value: string) {
@@ -480,6 +553,214 @@ function drawSummaryCard(
     font: fonts.bold,
     color: theme.text
   })
+}
+
+function drawFourMetricScorecard(
+  pdfDoc: PDFDocument,
+  fonts: ReportFonts,
+  cursor: Cursor,
+  metrics: { label: string; value: number | null }[]
+) {
+  const nextCursor =
+    ensureSpace(pdfDoc, fonts, cursor, 96)
+
+  const cardWidth = (contentWidth - 18 * 3) / 4
+
+  metrics.forEach((metric, index) => {
+    const x = margin + index * (cardWidth + 18)
+    const score = metric.value
+
+    drawSummaryCard(
+      nextCursor.page,
+      fonts,
+      x,
+      nextCursor.y,
+      cardWidth,
+      metric.label,
+      score === null ? "N/A" : `${score}/100`,
+      score === null ? theme.muted : scoreColor(score)
+    )
+  })
+
+  return {
+    page: nextCursor.page,
+    y: nextCursor.y - 102
+  }
+}
+
+function drawBulletList(
+  pdfDoc: PDFDocument,
+  fonts: ReportFonts,
+  cursor: Cursor,
+  heading: string,
+  items: string[]
+) {
+  let nextCursor =
+    ensureSpace(pdfDoc, fonts, cursor, 50)
+
+  nextCursor.page.drawText(heading, {
+    x: margin,
+    y: nextCursor.y,
+    size: 11,
+    font: fonts.bold,
+    color: theme.accent
+  })
+
+  nextCursor = {
+    page: nextCursor.page,
+    y: nextCursor.y - 20
+  }
+
+  if (items.length === 0) {
+    nextCursor.page.drawText("Nothing planned yet.", {
+      x: margin + 10,
+      y: nextCursor.y,
+      size: 9,
+      font: fonts.regular,
+      color: theme.muted
+    })
+
+    return {
+      page: nextCursor.page,
+      y: nextCursor.y - 20
+    }
+  }
+
+  for (const item of items) {
+    nextCursor = ensureSpace(pdfDoc, fonts, nextCursor, 30)
+
+    nextCursor.page.drawText("-", {
+      x: margin + 10,
+      y: nextCursor.y,
+      size: 9,
+      font: fonts.bold,
+      color: theme.muted
+    })
+
+    const consumed = drawText(
+      nextCursor.page,
+      item,
+      margin + 22,
+      nextCursor.y,
+      {
+        font: fonts.regular,
+        size: 9,
+        color: theme.text,
+        maxWidth: contentWidth - 34,
+        lineHeight: 12
+      }
+    )
+
+    nextCursor = {
+      page: nextCursor.page,
+      y: nextCursor.y - Math.max(consumed, 16) - 4
+    }
+  }
+
+  return nextCursor
+}
+
+function drawDataTable(
+  pdfDoc: PDFDocument,
+  fonts: ReportFonts,
+  cursor: Cursor,
+  columns: { header: string; width: number }[],
+  rows: string[][],
+  emptyLabel: string
+) {
+  let nextCursor =
+    ensureSpace(pdfDoc, fonts, cursor, 60)
+
+  if (rows.length === 0) {
+    drawCard(
+      nextCursor.page,
+      margin,
+      nextCursor.y,
+      contentWidth,
+      44
+    )
+
+    nextCursor.page.drawText(emptyLabel, {
+      x: margin + 16,
+      y: nextCursor.y - 27,
+      size: 10,
+      font: fonts.regular,
+      color: theme.muted
+    })
+
+    return {
+      page: nextCursor.page,
+      y: nextCursor.y - 64
+    }
+  }
+
+  // Header row
+  let columnX = margin
+
+  for (const column of columns) {
+    nextCursor.page.drawText(column.header, {
+      x: columnX + 12,
+      y: nextCursor.y - 4,
+      size: 8,
+      font: fonts.bold,
+      color: theme.muted
+    })
+
+    columnX += column.width
+  }
+
+  nextCursor = {
+    page: nextCursor.page,
+    y: nextCursor.y - 18
+  }
+
+  for (const row of rows) {
+    const rowHeight = 34
+
+    nextCursor = ensureSpace(
+      pdfDoc,
+      fonts,
+      nextCursor,
+      rowHeight + 8
+    )
+
+    drawCard(
+      nextCursor.page,
+      margin,
+      nextCursor.y,
+      contentWidth,
+      rowHeight
+    )
+
+    columnX = margin
+
+    row.forEach((cell, cellIndex) => {
+      const column = columns[cellIndex]
+
+      drawText(
+        nextCursor.page,
+        cell,
+        columnX + 12,
+        nextCursor.y - 22,
+        {
+          font: fonts.regular,
+          size: 9,
+          color: theme.text,
+          maxWidth: column.width - 20,
+          maxLines: 1
+        }
+      )
+
+      columnX += column.width
+    })
+
+    nextCursor = {
+      page: nextCursor.page,
+      y: nextCursor.y - (rowHeight + 8)
+    }
+  }
+
+  return nextCursor
 }
 
 function drawScoreGauge(
@@ -1166,13 +1447,24 @@ export async function generatePDFReport(
     y: cursor.y - 330
   }
 
+  const technicalSeo = parseTechnicalSeo(audit.technical_seo)
+  const aiInsights = parseAiInsights(audit.ai_insights)
+
   cursor = drawSectionTitle(
     pdfDoc,
     fonts,
     cursor,
     "Executive Summary",
-    "High-level performance and priority indicators for this crawl."
+    aiInsights?.executiveSummary ||
+      "High-level performance and priority indicators for this crawl."
   )
+
+  cursor = drawFourMetricScorecard(pdfDoc, fonts, cursor, [
+    { label: "SEO", value: audit.average_score },
+    { label: "AEO", value: technicalSeo?.aeo?.score ?? null },
+    { label: "AIO", value: technicalSeo?.aio?.score ?? null },
+    { label: "GEO", value: technicalSeo?.geo?.score ?? null }
+  ])
 
   cursor = drawBestWorstPages(
     pdfDoc,
@@ -1194,7 +1486,32 @@ export async function generatePDFReport(
     pdfDoc,
     fonts,
     cursor,
-    parseTechnicalSeo(audit.technical_seo)
+    technicalSeo
+  )
+
+  cursor = drawSectionTitle(
+    pdfDoc,
+    fonts,
+    cursor,
+    "Root Cause Summary",
+    "Every detected issue, categorized by type and severity."
+  )
+
+  cursor = drawDataTable(
+    pdfDoc,
+    fonts,
+    cursor,
+    [
+      { header: "ISSUE", width: contentWidth * 0.55 },
+      { header: "TYPE", width: contentWidth * 0.22 },
+      { header: "SEVERITY", width: contentWidth * 0.23 }
+    ],
+    (aiInsights?.rootCauseSummary || []).map((row) => [
+      safeText(row.issue),
+      safeText(row.type),
+      safeText(row.severity)
+    ]),
+    "No root-cause findings were generated for this audit."
   )
 
   cursor = drawSectionTitle(
@@ -1235,11 +1552,151 @@ export async function generatePDFReport(
     "Prioritized recommendations generated during the audit."
   )
 
-  drawRecommendations(
+  cursor = drawRecommendations(
     pdfDoc,
     fonts,
     cursor,
     pages
+  )
+
+  cursor = drawSectionTitle(
+    pdfDoc,
+    fonts,
+    cursor,
+    "Keyword Clusters & SERP Strategy",
+    "Suggested keyword clusters mapped to funnel stage and SERP/AI-answer target."
+  )
+
+  cursor = drawDataTable(
+    pdfDoc,
+    fonts,
+    cursor,
+    [
+      { header: "CLUSTER", width: contentWidth * 0.28 },
+      { header: "EXAMPLE KEYWORDS", width: contentWidth * 0.4 },
+      { header: "STAGE", width: contentWidth * 0.12 },
+      { header: "SERP TARGET", width: contentWidth * 0.2 }
+    ],
+    (aiInsights?.keywordClusters || []).map((cluster) => [
+      safeText(cluster.cluster),
+      safeText(cluster.exampleKeywords?.join(", ")),
+      safeText(cluster.funnelStage),
+      safeText(cluster.serpTarget)
+    ]),
+    "No keyword clusters were generated for this audit."
+  )
+
+  cursor = drawSectionTitle(
+    pdfDoc,
+    fonts,
+    cursor,
+    "Content & Social Plan",
+    "Blog series and social series generated from this audit's findings."
+  )
+
+  cursor = drawBulletList(
+    pdfDoc,
+    fonts,
+    cursor,
+    "Blog series",
+    (aiInsights?.blogSeries || []).flatMap((series) => [
+      series.seriesTitle,
+      ...series.posts.map((post) => `  - ${post.title}`)
+    ])
+  )
+
+  cursor = drawBulletList(
+    pdfDoc,
+    fonts,
+    cursor,
+    "Social series",
+    (aiInsights?.socialSeries || []).map(
+      (series) => `[${series.platform}] ${series.seriesTitle}`
+    )
+  )
+
+  cursor = drawSectionTitle(
+    pdfDoc,
+    fonts,
+    cursor,
+    "Ad Campaign Ideas",
+    "Suggested campaigns generated from this audit's findings."
+  )
+
+  cursor = drawDataTable(
+    pdfDoc,
+    fonts,
+    cursor,
+    [
+      { header: "CAMPAIGN", width: contentWidth * 0.32 },
+      { header: "OBJECTIVE", width: contentWidth * 0.44 },
+      { header: "CHANNELS", width: contentWidth * 0.24 }
+    ],
+    (aiInsights?.adCampaigns || []).map((campaign) => [
+      safeText(campaign.name),
+      safeText(campaign.objective),
+      safeText(campaign.channels?.join(", "))
+    ]),
+    "No ad campaign ideas were generated for this audit."
+  )
+
+  cursor = drawSectionTitle(
+    pdfDoc,
+    fonts,
+    cursor,
+    "90-Day Roadmap",
+    "Phased action plan from this audit's findings."
+  )
+
+  cursor = drawBulletList(
+    pdfDoc,
+    fonts,
+    cursor,
+    "0-2 Weeks",
+    aiInsights?.roadmap90Day?.zeroToTwoWeeks || []
+  )
+
+  cursor = drawBulletList(
+    pdfDoc,
+    fonts,
+    cursor,
+    "30 Days",
+    aiInsights?.roadmap90Day?.thirtyDays || []
+  )
+
+  cursor = drawBulletList(
+    pdfDoc,
+    fonts,
+    cursor,
+    "60-90 Days",
+    aiInsights?.roadmap90Day?.sixtyToNinetyDays || []
+  )
+
+  cursor = drawSectionTitle(
+    pdfDoc,
+    fonts,
+    cursor,
+    "KPI Framework",
+    "Baseline vs. 90-day target for each tracked area."
+  )
+
+  drawDataTable(
+    pdfDoc,
+    fonts,
+    cursor,
+    [
+      { header: "AREA", width: contentWidth * 0.15 },
+      { header: "METRIC", width: contentWidth * 0.4 },
+      { header: "BASELINE", width: contentWidth * 0.22 },
+      { header: "90-DAY TARGET", width: contentWidth * 0.23 }
+    ],
+    (aiInsights?.kpiFramework || []).map((kpi) => [
+      safeText(kpi.area),
+      safeText(kpi.metric),
+      safeText(kpi.baseline),
+      safeText(kpi.target)
+    ]),
+    "No KPI framework was generated for this audit."
   )
 
   return pdfDoc.save()
