@@ -130,6 +130,10 @@ const pageWidth = 842
 const pageHeight = 595
 const margin = 44
 const contentWidth = pageWidth - margin * 2
+// Clearance reserved above every section title so its 17pt bold
+// heading (drawn at its baseline) never crowds the small trailing gap
+// the previous section leaves behind.
+const sectionTitleTopGap = 20
 const theme: ReportTheme = {
   background: rgb(0.03, 0.04, 0.06),
   panel: rgb(0.08, 0.09, 0.12),
@@ -470,8 +474,18 @@ function drawSectionTitle(
   title: string,
   subtitle?: string
 ) {
+  // drawText's y is the baseline, not the top of the glyph box — a
+  // 17pt bold heading's ascender extends ~12-13pt above it, which
+  // easily crowds into the small (4-8pt) trailing gap most content
+  // blocks leave. Reserve extra clearance above every title so it
+  // never visually overlaps the previous section's last element.
+  const gapped: Cursor = {
+    page: cursor.page,
+    y: cursor.y - sectionTitleTopGap
+  }
+
   const nextCursor =
-    ensureSpace(pdfDoc, fonts, cursor, 58)
+    ensureSpace(pdfDoc, fonts, gapped, 58)
 
   nextCursor.page.drawText(title, {
     x: margin,
