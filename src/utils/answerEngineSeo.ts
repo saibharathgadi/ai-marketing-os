@@ -1,13 +1,24 @@
 import { fetchWithSsrfProtection } from "./urlValidation"
 
-const aiCrawlerUserAgents = [
+// Bots that retrieve/cite content in real time for AI answer engines
+// (ChatGPT, Claude, Perplexity, Google AI Overviews). Blocking these
+// directly hurts AEO/GEO citation eligibility, which is what this
+// check is meant to catch.
+//
+// Deliberately excludes training-data crawlers (CCBot, Bytespider,
+// meta-externalagent, etc.) — those scrape content to build model
+// training datasets, not to answer live queries. Blocking them is a
+// common, legitimate publisher choice (opting out of having your
+// content used for training) with no bearing on whether the site can
+// be cited by an AI answer engine, so it must never be flagged as an
+// AIO problem here.
+const answerEngineCrawlerUserAgents = [
   "gptbot",
   "chatgpt-user",
   "claudebot",
   "anthropic-ai",
   "perplexitybot",
-  "google-extended",
-  "ccbot"
+  "google-extended"
 ]
 
 async function fetchTextSafely(url: string) {
@@ -48,13 +59,26 @@ async function checkUrlExists(url: string) {
   }
 }
 
+// Canonical display casing for the issue message — matched against
+// the lowercased agent names the parser below produces.
+const answerEngineCrawlerDisplayNames: Record<string, string> = {
+  gptbot: "GPTBot",
+  "chatgpt-user": "ChatGPT-User",
+  claudebot: "ClaudeBot",
+  "anthropic-ai": "anthropic-ai",
+  perplexitybot: "PerplexityBot",
+  "google-extended": "Google-Extended"
+}
+
 /**
- * Heuristic parse of robots.txt: flags a site as blocking AI crawlers only
- * when a *named* AI bot user-agent (not the generic "*" wildcard, which is
- * usually just normal crawl-budget hygiene) has an explicit "Disallow: /"
- * rule blocking the entire site.
+ * Heuristic parse of robots.txt: returns the subset of
+ * `answerEngineCrawlerUserAgents` that have an explicit "Disallow: /"
+ * rule blocking the entire site (not the generic "*" wildcard, which
+ * is usually just normal crawl-budget hygiene). Named training-data
+ * crawlers being blocked is intentionally invisible to this check —
+ * see the comment on `answerEngineCrawlerUserAgents`.
  */
-function robotsBlocksAiCrawlers(robotsText: string) {
+function findBlockedAnswerEngineCrawlers(robotsText: string) {
   let currentAgents: string[] = []
   let lastLineWasRule = false
   const blockedAgents = new Set<string>()
@@ -85,7 +109,7 @@ function robotsBlocksAiCrawlers(robotsText: string) {
 
       if (value === "/") {
         for (const agent of currentAgents) {
-          if (aiCrawlerUserAgents.includes(agent)) {
+          if (answerEngineCrawlerUserAgents.includes(agent)) {
             blockedAgents.add(agent)
           }
         }
@@ -99,7 +123,7 @@ function robotsBlocksAiCrawlers(robotsText: string) {
     }
   }
 
-  return blockedAgents.size > 0
+  return [...blockedAgents]
 }
 
 export type AnswerEngineSeoResult = {
@@ -186,7 +210,7 @@ export async function analyzeAnswerEngineSeo(
 
   // ---- AIO: AI-crawler / overview optimization ----
 
-  let aiCrawlersAllowed = true
+  let blockedAnswerEngineCrawlers: string[] = []
   let robotsText: string | null = null
 
   try {
@@ -194,8 +218,11 @@ export async function analyzeAnswerEngineSeo(
   } catch {}
 
   if (robotsText) {
-    aiCrawlersAllowed = !robotsBlocksAiCrawlers(robotsText)
+    blockedAnswerEngineCrawlers =
+      findBlockedAnswerEngineCrawlers(robotsText)
   }
+
+  const aiCrawlersAllowed = blockedAnswerEngineCrawlers.length === 0
 
   let llmsTxt = false
 
@@ -212,8 +239,12 @@ export async function analyzeAnswerEngineSeo(
   let aioScore = 100
 
   if (!aiCrawlersAllowed) {
+    const blockedDisplayNames = blockedAnswerEngineCrawlers.map(
+      (agent) => answerEngineCrawlerDisplayNames[agent] ?? agent
+    )
+
     aioIssues.push(
-      "robots.txt explicitly blocks known AI crawlers (GPTBot, ClaudeBot, PerplexityBot, or Google-Extended) — this excludes the site from being cited by ChatGPT, Claude, and AI Overviews."
+      `robots.txt explicitly blocks these AI answer-engine crawlers: ${blockedDisplayNames.join(", ")} — this excludes the site from being cited by ChatGPT, Claude, and AI Overviews.`
     )
     aioScore -= 30
   }
