@@ -450,6 +450,8 @@ export default async function AuditDetailPage({
 
           <AuditCopilotTabs
             aiInsights={currentAudit.ai_insights as AIInsights}
+            auditId={currentAudit.id}
+            siteUrl={currentAudit.url}
           />
 
         )}
