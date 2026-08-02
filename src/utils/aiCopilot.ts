@@ -1,6 +1,9 @@
 import { createServiceClient } from "@/lib/supabase/service"
 import { isMissingColumnError } from "./schemaCompat"
-import { generateStructuredJSON } from "./aiProvider"
+import {
+  generateGroundedResearch,
+  generateStructuredJSON
+} from "./aiProvider"
 import type { AnswerEngineSeoResult } from "./answerEngineSeo"
 
 export type AIInsights = {
@@ -112,6 +115,11 @@ type PageSample = {
   wordCount: number
   seoScore: number
   issues: string[]
+  // First ~600 chars of the page's actual extracted body text — gives
+  // the AI real source content to ground brand/product/ownership facts
+  // in, instead of relying solely on title/metaDescription (which are
+  // often too thin to correct a stale training-data assumption).
+  contentSnippet: string
 }
 
 function deriveBrandName(siteUrl?: string | null) {
@@ -597,6 +605,8 @@ type AIContextInput = {
   siteUrl?: string | null
 
   pageSamples?: PageSample[]
+
+  competitorResearch?: string | null
 }
 
 export function buildAIContext(
@@ -642,7 +652,13 @@ export function buildAIContext(
     // the AI can ground findings in this site's actual content — e.g.
     // quoting a genuinely thin meta description — rather than producing
     // generic, could-be-any-site advice.
-    pageSamples: (input.pageSamples ?? []).slice(0, 12)
+    pageSamples: (input.pageSamples ?? []).slice(0, 12),
+
+    // Live web-search findings (current company name/ownership/branding,
+    // real competitors and their content angles) — null when no Gemini
+    // key is configured or the grounding call failed. See the system
+    // prompt for how this is meant to be weighted against pageSamples.
+    competitorResearch: input.competitorResearch ?? null
   }
 }
 
@@ -718,7 +734,29 @@ const requiredJsonStructure = `{
 export async function generateAIInsights(
   input: AIContextInput
 ): Promise<AIInsights> {
-  const context = buildAIContext(input)
+  // Best-effort live research (see generateGroundedResearch's doc comment
+  // for why this has to be a separate call from the structured-JSON one
+  // below). Failure here must never block the audit — it degrades to
+  // null and the system prompt below already tells the model how to
+  // proceed without it.
+  const competitorResearch = input.siteUrl
+    ? await generateGroundedResearch(
+        `Using live web search, research the company/website at ${input.siteUrl} ` +
+          `(likely operating under the name "${deriveBrandName(input.siteUrl)}"). ` +
+          `Report three things concretely: (1) its correct, current company name ` +
+          `and ownership/branding as of today — explicitly flag any recent merger, ` +
+          `acquisition, spinoff, or rebrand (for example, a company that used to be ` +
+          `a subsidiary of a larger corporation but has since become independent, ` +
+          `or vice versa), since this kind of fact frequently goes stale in AI ` +
+          `training data; (2) 3-5 real, current direct competitors in its market; ` +
+          `(3) concrete, current examples of the blog posts, social content, or ` +
+          `marketing angles those competitors are publishing right now. Be specific ` +
+          `and current — do not rely on outdated assumptions, and say so plainly if ` +
+          `you are not confident in a fact.`
+      )
+    : null
+
+  const context = buildAIContext({ ...input, competitorResearch })
 
   const fallbackArgs = {
     seoScore: context.seoScore,
@@ -733,7 +771,7 @@ export async function generateAIInsights(
 
   const result = await generateStructuredJSON({
     systemPrompt:
-      "You are a professional SEO, AEO/AIO/GEO, and full-funnel marketing intelligence assistant producing a 360-degree digital marketing audit. Ground every finding in the specific context provided — reference the site's actual URL, page titles, and meta descriptions where relevant instead of generic advice that could apply to any site. Return valid JSON only, matching the required structure exactly.",
+      "You are a professional SEO, AEO/AIO/GEO, and full-funnel marketing intelligence assistant producing a 360-degree digital marketing audit. Ground every finding in the specific context provided — reference the site's actual URL, page titles, meta descriptions, and pageSamples[].contentSnippet (real extracted body text) where relevant instead of generic advice that could apply to any site. Accuracy over assumption: for any factual claim about the audited company or product — its name, ownership, parent company, or branding — prioritize what pageSamples and competitorResearch actually show over your own training data, which can be outdated (for example, a company that has since been divested, renamed, or acquired). If competitorResearch is present, treat it as current, live-researched ground truth: use its named competitors and their real content/marketing angles to make contentIdeas, socialIdeas, blogSeries, socialSeries, and adCampaigns concretely competitive and current rather than generic. If a fact is not supported by the provided context and you are not confident it is still current, phrase it cautiously rather than asserting it outright. Return valid JSON only, matching the required structure exactly.",
     userPrompt: `Context:\n${JSON.stringify(
       context,
       null,
@@ -866,6 +904,7 @@ type AuditForInsights = {
     wordCount?: number
     seoScore?: number
     seoIssues?: string[]
+    text?: string
   }[]
   siteSummary?: {
     averageSeoScore?: number
@@ -931,7 +970,8 @@ export async function generateAndPersistAuditInsights(
         metaDescription: page.metaDescription ?? null,
         wordCount: page.wordCount ?? 0,
         seoScore: page.seoScore ?? 0,
-        issues: page.seoIssues ?? []
+        issues: page.seoIssues ?? [],
+        contentSnippet: (page.text ?? "").slice(0, 600)
       }))
 
     const siteUrl =

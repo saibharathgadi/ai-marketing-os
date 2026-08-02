@@ -1,16 +1,20 @@
 @import "tailwindcss";
 
 /*
- * Single always-dark theme (the app has no light mode) with a violet/indigo
+ * Dual dark/light theme, both built around the same violet/indigo brand
  * accent, wired to the shadcn-style component primitives in
  * src/components/ui/ (Button/Card/Badge/Tabs/etc.) so bg-primary,
  * bg-card, text-muted-foreground, etc. resolve to real values instead of
- * falling back to unstyled defaults.
+ * falling back to unstyled defaults. The active theme is selected by a
+ * data-theme attribute on <html> (see ThemeProvider.tsx) — :root is the
+ * dark palette so anything that renders before the attribute is applied
+ * (or with JS disabled) still gets a fully-styled theme, not FOUC.
  */
-:root {
+:root,
+[data-theme="dark"] {
   --radius: 0.75rem;
 
-  --background: #000000;
+  --background: #09090b;
   --foreground: #fafafa;
 
   --card: #18181b;
@@ -37,6 +41,60 @@
   --border: #27272a;
   --input: #27272a;
   --ring: #8b5cf6;
+
+  --gradient-glow: radial-gradient(
+    ellipse 60% 50% at 50% -10%,
+    rgba(139, 92, 246, 0.25),
+    transparent 70%
+  );
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-elevated:
+    0 2px 4px rgba(0, 0, 0, 0.5), 0 16px 40px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(139, 92, 246, 0.08);
+}
+
+[data-theme="light"] {
+  --radius: 0.75rem;
+
+  --background: #f7f7fb;
+  --foreground: #18181b;
+
+  --card: #ffffff;
+  --card-foreground: #18181b;
+
+  --popover: #ffffff;
+  --popover-foreground: #18181b;
+
+  --primary: #7c3aed;
+  --primary-foreground: #ffffff;
+
+  --secondary: #f0f0f5;
+  --secondary-foreground: #18181b;
+
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+
+  --accent: #ede9fe;
+  --accent-foreground: #4c1d95;
+
+  --destructive: #dc2626;
+  --destructive-foreground: #fef2f2;
+
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --ring: #7c3aed;
+
+  --gradient-glow: radial-gradient(
+    ellipse 60% 50% at 50% -10%,
+    rgba(124, 58, 237, 0.12),
+    transparent 70%
+  );
+
+  --shadow-card: 0 1px 2px rgba(24, 24, 27, 0.04), 0 8px 24px rgba(24, 24, 27, 0.06);
+  --shadow-elevated:
+    0 2px 4px rgba(24, 24, 27, 0.06), 0 16px 40px rgba(24, 24, 27, 0.08),
+    0 0 0 1px rgba(124, 58, 237, 0.06);
 }
 
 @theme inline {
@@ -75,3 +133,7 @@
 
   --font-heading: ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
+
+/* Not part of @theme inline (not colors Tailwind needs to generate
+   utilities for) — consumed directly via style/className arbitrary
+   value, e.g. shadow-[var(--shadow-card)] or bg-[image:var(--gradient-glow)]. */

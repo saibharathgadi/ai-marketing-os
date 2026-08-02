@@ -36,14 +36,14 @@ function renderBody(item: ContentItem) {
       return (
         <div className="space-y-2">
           {typeof body.description === "string" && (
-            <p className="text-sm text-zinc-400">{body.description}</p>
+            <p className="text-sm text-muted-foreground">{body.description}</p>
           )}
-          <ol className="list-decimal list-inside space-y-1 text-sm text-zinc-300">
+          <ol className="list-decimal list-inside space-y-1 text-sm text-foreground">
             {posts.map((post, index) => (
               <li key={index}>
                 <span className="font-medium">{post.title}</span>
                 {post.angle && (
-                  <span className="text-zinc-500"> — {post.angle}</span>
+                  <span className="text-muted-foreground"> — {post.angle}</span>
                 )}
               </li>
             ))}
@@ -61,12 +61,12 @@ function renderBody(item: ContentItem) {
           {typeof body.platform === "string" && (
             <Badge variant="outline">{body.platform}</Badge>
           )}
-          <ul className="space-y-2 text-sm text-zinc-300">
+          <ul className="space-y-2 text-sm text-foreground">
             {posts.map((post, index) => (
               <li key={index}>
                 <p className="font-medium">{post.hook}</p>
                 {post.caption && (
-                  <p className="text-zinc-500 mt-1">{post.caption}</p>
+                  <p className="text-muted-foreground mt-1">{post.caption}</p>
                 )}
               </li>
             ))}
@@ -77,7 +77,7 @@ function renderBody(item: ContentItem) {
 
     case "social_idea":
       return (
-        <div className="space-y-2 text-sm text-zinc-300">
+        <div className="space-y-2 text-sm text-foreground">
           {typeof body.platform === "string" && (
             <Badge variant="outline">{body.platform}</Badge>
           )}
@@ -87,48 +87,48 @@ function renderBody(item: ContentItem) {
 
     case "ad_campaign":
       return (
-        <div className="space-y-1 text-sm text-zinc-300">
+        <div className="space-y-1 text-sm text-foreground">
           {typeof body.objective === "string" && (
-            <p><span className="text-zinc-500">Objective:</span> {body.objective}</p>
+            <p><span className="text-muted-foreground">Objective:</span> {body.objective}</p>
           )}
           {typeof body.targetAudience === "string" && (
-            <p><span className="text-zinc-500">Audience:</span> {body.targetAudience}</p>
+            <p><span className="text-muted-foreground">Audience:</span> {body.targetAudience}</p>
           )}
           {typeof body.keyMessage === "string" && (
-            <p><span className="text-zinc-500">Key message:</span> {body.keyMessage}</p>
+            <p><span className="text-muted-foreground">Key message:</span> {body.keyMessage}</p>
           )}
           {Array.isArray(body.channels) && (
-            <p><span className="text-zinc-500">Channels:</span> {(body.channels as string[]).join(", ")}</p>
+            <p><span className="text-muted-foreground">Channels:</span> {(body.channels as string[]).join(", ")}</p>
           )}
         </div>
       )
 
     case "ad_set":
       return (
-        <div className="space-y-1 text-sm text-zinc-300">
+        <div className="space-y-1 text-sm text-foreground">
           {typeof body.audienceAngle === "string" && (
-            <p><span className="text-zinc-500">Audience angle:</span> {body.audienceAngle}</p>
+            <p><span className="text-muted-foreground">Audience angle:</span> {body.audienceAngle}</p>
           )}
           {typeof body.creativeAngle === "string" && (
-            <p><span className="text-zinc-500">Creative angle:</span> {body.creativeAngle}</p>
+            <p><span className="text-muted-foreground">Creative angle:</span> {body.creativeAngle}</p>
           )}
           {typeof body.suggestedBudgetSplit === "string" && (
-            <p><span className="text-zinc-500">Budget split:</span> {body.suggestedBudgetSplit}</p>
+            <p><span className="text-muted-foreground">Budget split:</span> {body.suggestedBudgetSplit}</p>
           )}
         </div>
       )
 
     case "keyword_cluster":
       return (
-        <div className="space-y-1 text-sm text-zinc-300">
+        <div className="space-y-1 text-sm text-foreground">
           {Array.isArray(body.exampleKeywords) && (
-            <p><span className="text-zinc-500">Keywords:</span> {(body.exampleKeywords as string[]).join(", ")}</p>
+            <p><span className="text-muted-foreground">Keywords:</span> {(body.exampleKeywords as string[]).join(", ")}</p>
           )}
           {typeof body.funnelStage === "string" && (
-            <p><span className="text-zinc-500">Funnel stage:</span> {body.funnelStage}</p>
+            <p><span className="text-muted-foreground">Funnel stage:</span> {body.funnelStage}</p>
           )}
           {typeof body.serpTarget === "string" && (
-            <p><span className="text-zinc-500">SERP target:</span> {body.serpTarget}</p>
+            <p><span className="text-muted-foreground">SERP target:</span> {body.serpTarget}</p>
           )}
         </div>
       )
@@ -140,9 +140,9 @@ function renderBody(item: ContentItem) {
           : []
 
       return (
-        <div className="space-y-2 text-sm text-zinc-300">
+        <div className="space-y-2 text-sm text-foreground">
           {typeof body.targetOffer === "string" && (
-            <p><span className="text-zinc-500">Target offer:</span> {body.targetOffer}</p>
+            <p><span className="text-muted-foreground">Target offer:</span> {body.targetOffer}</p>
           )}
           {typeof body.description === "string" && <p>{body.description}</p>}
           {sections.length > 0 && (
@@ -151,7 +151,7 @@ function renderBody(item: ContentItem) {
                 <li key={index}>
                   <span className="font-medium">{section.name}</span>
                   {section.purpose && (
-                    <span className="text-zinc-500"> — {section.purpose}</span>
+                    <span className="text-muted-foreground"> — {section.purpose}</span>
                   )}
                 </li>
               ))}
@@ -164,7 +164,7 @@ function renderBody(item: ContentItem) {
     case "blog_idea":
     default:
       return (
-        <div className="text-sm text-zinc-300">
+        <div className="text-sm text-foreground">
           {typeof body.description === "string" && <p>{body.description}</p>}
         </div>
       )
@@ -320,25 +320,25 @@ function ContentItemDialogInner({
 
     <Dialog open={open} onOpenChange={onOpenChange}>
 
-      <DialogContent className="sm:max-w-lg bg-zinc-950 border border-zinc-800">
+      <DialogContent className="sm:max-w-lg bg-background border border-border">
 
         <DialogHeader>
           <Badge variant="outline" className="w-fit">
             {contentItemTypeLabels[item.type]}
           </Badge>
-          <DialogTitle className="text-white">
+          <DialogTitle className="text-foreground">
             AI-generated content
           </DialogTitle>
         </DialogHeader>
 
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+        <div className="rounded-xl border border-border bg-card p-4">
           {renderBody(item)}
         </div>
 
         <div className="space-y-3">
 
           <div>
-            <label className="text-xs text-zinc-500">Title</label>
+            <label className="text-xs text-muted-foreground">Title</label>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -347,7 +347,7 @@ function ContentItemDialogInner({
           </div>
 
           <div>
-            <label className="text-xs text-zinc-500">Status</label>
+            <label className="text-xs text-muted-foreground">Status</label>
             <div className="mt-1 flex gap-2">
               {statusOptions.map((option) => (
                 <Button
@@ -364,7 +364,7 @@ function ContentItemDialogInner({
           </div>
 
           <div>
-            <label className="text-xs text-zinc-500">Notes</label>
+            <label className="text-xs text-muted-foreground">Notes</label>
             <Textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
