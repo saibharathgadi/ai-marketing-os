@@ -350,6 +350,15 @@ export function generateFallbackInsights(
 
   const brand = deriveBrandName(siteUrl)
 
+  // detectedThemes is only ever populated by the AI provider itself
+  // (see generateAIInsights) — it's always [] on this fallback path, so
+  // every template below is written to read naturally with only the
+  // brand name, with a themed variant used when a theme happens to be
+  // available (kept for forward-compatibility, not the common case).
+  const hasTheme = detectedThemes.length > 0
+  const theme = detectedThemes[0]
+  const themeLower = theme?.toLowerCase()
+
   const executiveSummary =
     seoScore >= 85
       ? "Your website SEO health is strong overall with only minor optimization opportunities."
@@ -385,21 +394,23 @@ export function generateFallbackInsights(
 
   const contentIdeas: AIInsights["contentIdeas"] = [
     {
-      title: "Technical SEO Checklist for Better Rankings",
-      description:
-        "Educational content explaining SEO best practices and technical optimization.",
+      title: hasTheme
+        ? `A Complete Guide to ${theme}`
+        : `Why Choose ${brand}: A Buyer's Guide`,
+      description: hasTheme
+        ? `Top-of-funnel educational content that positions ${brand} as the authority on ${themeLower} — written for prospects who are searching the problem, not yet the brand.`
+        : `Top-of-funnel educational content explaining what ${brand} does and who it's for — written for prospects who don't know the brand yet.`,
       type: "blog"
     },
     {
-      title: "Common SEO Mistakes Businesses Still Make",
+      title: `How Customers Use ${brand}`,
       description:
-        "Content targeting recurring SEO problems detected during audits.",
+        "A use-case-driven piece highlighting real outcomes, aimed at readers already comparing options.",
       type: "blog"
     },
     {
-      title: `Landing Page: See ${brand}'s Marketing Health Score`,
-      description:
-        "A conversion-focused landing page pitching a free audit as the entry point to your funnel.",
+      title: `${brand}: See It in Action`,
+      description: `A conversion-focused landing page demoing ${brand}'s product, built to turn organic/paid traffic into signups or demo requests.`,
       type: "landing-page"
     }
   ]
@@ -407,33 +418,38 @@ export function generateFallbackInsights(
   const socialIdeas: AIInsights["socialIdeas"] = [
     {
       platform: "linkedin",
-      idea:
-        "5 SEO mistakes businesses still make and how to fix them."
+      idea: hasTheme
+        ? `A post breaking down why ${themeLower} matters for ${brand}'s target customers, with a soft CTA to learn more.`
+        : `A post introducing what ${brand} does and who it's built for, with a soft CTA to learn more.`
     },
     {
       platform: "twitter",
-      idea:
-        "Quick SEO wins that can improve website visibility this week."
+      idea: `A short thread sharing one practical tip ${brand}'s customers care about, tying back to what ${brand} offers.`
     }
   ]
 
   const blogSeries: AIInsights["blogSeries"] = [
     {
-      seriesTitle: "The Complete SEO Health Series",
-      description:
-        "A multi-part series turning each recurring audit finding into a standalone, shareable guide.",
+      seriesTitle: hasTheme
+        ? `The ${brand} Guide to ${theme}`
+        : `The ${brand} Buyer's Journey`,
+      description: `A multi-part series turning ${brand}'s expertise into a shareable, SEO-friendly resource hub.`,
       posts: [
         {
-          title: "Part 1: Why Meta Descriptions Still Matter in 2026",
-          angle: "Beginner-friendly explainer with before/after examples."
+          title: hasTheme
+            ? `Part 1: What Is ${theme}, and Why It Matters`
+            : `Part 1: What ${brand} Does, and Who It's For`,
+          angle: "Beginner-friendly explainer for prospects new to the category."
         },
         {
-          title: "Part 2: Fixing Your Heading Structure for SEO and AI Search",
-          angle: "Technical walkthrough targeting site owners and developers."
+          title: hasTheme
+            ? `Part 2: How to Evaluate a ${theme} Solution`
+            : `Part 2: What to Look for When Evaluating ${brand}`,
+          angle: "Comparison-style content for prospects actively evaluating options."
         },
         {
-          title: "Part 3: How to Build Topical Authority With Thin Content",
-          angle: "Content-strategy angle for marketing teams."
+          title: `Part 3: Getting the Most Out of ${brand}`,
+          angle: "Customer-facing content deepening retention and advocacy."
         }
       ]
     }
@@ -442,17 +458,17 @@ export function generateFallbackInsights(
   const socialSeries: AIInsights["socialSeries"] = [
     {
       platform: "linkedin",
-      seriesTitle: "SEO Myth-Busting Week",
+      seriesTitle: `${brand} Customer Spotlight`,
       posts: [
         {
-          hook: "Myth: More keywords always means better rankings.",
-          caption:
-            "Reality check on keyword stuffing vs. topical relevance, with a CTA to get a free audit."
+          hook: hasTheme
+            ? `Meet a ${brand} customer solving ${themeLower} challenges.`
+            : `Meet a ${brand} customer and the problem it solved for them.`,
+          caption: "A short case-study-style post building social proof."
         },
         {
-          hook: "Myth: Once you rank #1, you're done.",
-          caption:
-            "Why regression monitoring matters, tying into the product's monitoring feature."
+          hook: `The #1 mistake teams make before finding ${brand}.`,
+          caption: `Ties a common pain point back to how ${brand} solves it.`
         }
       ]
     }
@@ -460,22 +476,23 @@ export function generateFallbackInsights(
 
   const adCampaigns: AIInsights["adCampaigns"] = [
     {
-      name: "Free SEO Audit — Awareness Push",
-      objective: "Top-of-funnel lead generation via a free audit offer.",
-      targetAudience:
-        "Marketing managers and founders at small-to-mid-size businesses.",
-      keyMessage:
-        "Find out what's silently hurting your search rankings — in under 60 seconds.",
+      name: `${brand} — Qualified Lead Generation`,
+      objective: hasTheme
+        ? `Drive demo requests or signups from prospects actively searching for ${themeLower} solutions.`
+        : `Drive demo requests or signups from prospects who fit ${brand}'s target customer profile.`,
+      targetAudience: hasTheme
+        ? `Decision-makers evaluating ${themeLower} options similar to what ${brand} offers.`
+        : `Decision-makers evaluating options similar to what ${brand} offers.`,
+      keyMessage: `See how ${brand} can help — get started in minutes.`,
       channels: ["Google Search", "LinkedIn", "Meta"]
     }
   ]
 
   const adSets: AIInsights["adSets"] = [
     {
-      campaignName: "Free SEO Audit — Awareness Push",
-      audienceAngle: "Site owners who haven't audited their site in 6+ months.",
-      creativeAngle:
-        "Before/after score comparison visual with a single-click CTA.",
+      campaignName: `${brand} — Qualified Lead Generation`,
+      audienceAngle: `Prospects who've shown buying intent but haven't tried ${brand} yet.`,
+      creativeAngle: `Before/after or outcome-focused visual showing the value ${brand} delivers.`,
       suggestedBudgetSplit:
         "60% prospecting, 40% retargeting site visitors who didn't convert."
     }
@@ -483,26 +500,24 @@ export function generateFallbackInsights(
 
   const landingPageIdeas: AIInsights["landingPageIdeas"] = [
     {
-      title: "Free Website SEO & AI-Readiness Audit",
-      targetOffer: "Instant, free audit report as a lead magnet.",
+      title: hasTheme ? `${brand}: ${theme}` : `${brand}: See It in Action`,
+      targetOffer: `A free trial, demo, or consultation with ${brand}.`,
       sections: [
         {
           name: "Hero",
           purpose: "Communicate the core value prop in one glance.",
-          copyHint:
-            "\"Is your website ready for search and AI answer engines? Find out free.\""
+          copyHint: `"${brand} makes it simple — see how in minutes."`
         },
         {
           name: "Social proof",
-          purpose: "Build trust before asking for the URL.",
-          copyHint: "Logos or a short stat about audits run."
+          purpose: "Build trust before asking for contact details.",
+          copyHint: "Customer logos, testimonials, or a key usage stat."
         },
         {
           name: "FAQ",
           purpose:
             "Pre-empt objections and add FAQPage schema for answer-engine visibility.",
-          copyHint:
-            "Answer \"How long does it take?\" and \"Is it really free?\""
+          copyHint: `Answer the top 2-3 questions prospects ask about ${brand}.`
         }
       ]
     }
@@ -518,9 +533,11 @@ export function generateFallbackInsights(
       : "Focus this week on improving content quality and metadata consistency."
 
   const marketingOpportunities = [
-    "Create educational SEO-focused blog content.",
-    "Publish social media tips related to technical SEO improvements.",
-    "Expand website content targeting search visibility improvements."
+    hasTheme
+      ? `Publish educational content around ${themeLower} to attract organic search traffic.`
+      : `Publish educational content explaining what ${brand} does to attract organic search traffic.`,
+    `Share ${brand} customer wins and use cases on social media to build trust with prospects.`,
+    `Expand on-site content covering ${brand}'s product to improve topical authority.`
   ]
 
   if (answerEngineSeo && !answerEngineSeo.aeo.faqSchema) {
