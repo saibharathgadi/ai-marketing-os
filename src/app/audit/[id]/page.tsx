@@ -11,6 +11,7 @@ import AuditCopilotTabs, {
   type AIInsights
 } from "@/components/AuditCopilotTabs"
 import { Card } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 
 export const metadata: Metadata = {
   robots: {
@@ -258,36 +259,32 @@ export default async function AuditDetailPage({
 
       <div className="max-w-7xl mx-auto px-6 py-10">
 
-        <h1 className="text-5xl font-bold">
-          Audit Details
-        </h1>
+        <div className="flex flex-wrap items-start justify-between gap-6">
 
-        <p className="text-zinc-400 mt-3 break-all">
-          {currentAudit?.url}
-        </p>
+          <div>
 
-        <div className="flex flex-wrap gap-4 mt-6">
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center gap-1.5 text-sm text-zinc-400 hover:text-white transition"
+            >
+              ← Back to Dashboard
+            </Link>
 
-          <Link
-            href="/dashboard"
-            className="rounded-xl bg-zinc-800 px-5 py-3"
-          >
-            ← Dashboard
-          </Link>
+            <h1 className="text-4xl font-bold mt-3">
+              Audit Details
+            </h1>
 
-          <Link
-            href="/"
-            className="rounded-xl bg-zinc-800 px-5 py-3"
-          >
-            🏠 Home
-          </Link>
+            <p className="text-zinc-400 mt-2 break-all">
+              {currentAudit?.url}
+            </p>
 
-          <Link
-            href={`/api/report/${id}`}
-            className="rounded-xl bg-white text-black px-5 py-3 font-semibold"
-          >
-            Download PDF
-          </Link>
+          </div>
+
+          <Button asChild size="lg" className="h-auto py-3 px-6">
+            <Link href={`/api/report/${id}`}>
+              Download PDF
+            </Link>
+          </Button>
 
         </div>
 
