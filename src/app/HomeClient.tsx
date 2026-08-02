@@ -175,7 +175,12 @@ export default function HomeClient() {
 
   return (
 
-    <main className="min-h-screen bg-black text-white">
+    <main className="relative min-h-screen bg-background text-foreground overflow-hidden">
+
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[image:var(--gradient-glow)]"
+      />
 
       <div className="max-w-3xl mx-auto px-6 py-20">
 
@@ -185,14 +190,14 @@ export default function HomeClient() {
             Run a Complete Digital Marketing Audit
           </h1>
 
-          <p className="text-zinc-400 mt-5 text-lg max-w-2xl mx-auto">
+          <p className="text-muted-foreground mt-5 text-lg max-w-2xl mx-auto">
             SEO, AEO, AIO, and GEO scoring, a full-site crawl, and an
             AI-generated content, campaign, and roadmap plan — in one report.
           </p>
 
         </div>
 
-        <Card className="mt-10 rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
+        <Card className="mt-10 rounded-2xl border border-border bg-card p-6">
 
           <div className="flex flex-col md:flex-row gap-4">
 
@@ -208,7 +213,7 @@ export default function HomeClient() {
                   handleAnalyze()
                 }
               }}
-              className="flex-1 rounded-xl bg-black border border-zinc-700 px-5 py-4 outline-none focus:border-violet-500"
+              className="flex-1 rounded-xl bg-background border border-border px-5 py-4 outline-none focus:border-primary"
             />
 
             <Button
@@ -226,7 +231,7 @@ export default function HomeClient() {
 
           </div>
 
-          <p className="text-zinc-500 text-xs mt-3">
+          <p className="text-muted-foreground text-xs mt-3">
             A full crawl typically takes 20–45 seconds depending on site size.
           </p>
 
@@ -254,7 +259,7 @@ export default function HomeClient() {
 
         <section className="mt-24">
 
-          <p className="text-zinc-500 text-sm uppercase tracking-wide text-center">
+          <p className="text-muted-foreground text-sm uppercase tracking-wide text-center">
             FAQ
           </p>
 
@@ -264,7 +269,7 @@ export default function HomeClient() {
 
               <div key={faq.question}>
                 <h2 className="text-xl font-semibold">{faq.question}</h2>
-                <p className="text-zinc-400 mt-2 leading-relaxed">{faq.answer}</p>
+                <p className="text-muted-foreground mt-2 leading-relaxed">{faq.answer}</p>
               </div>
 
             ))}

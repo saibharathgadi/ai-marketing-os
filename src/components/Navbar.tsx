@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
+import { ThemeToggle } from "@/components/ThemeToggle"
 import { cn } from "@/lib/utils"
 
 const navLinks = [
@@ -33,7 +34,7 @@ export default function Navbar() {
 
   return (
 
-    <header className="border-b border-zinc-800 bg-black/80 backdrop-blur-xl sticky top-0 z-50">
+    <header className="border-b border-border bg-background/80 backdrop-blur-xl sticky top-0 z-50">
 
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
 
@@ -54,14 +55,16 @@ export default function Navbar() {
               className={cn(
                 "text-sm transition",
                 pathname === link.href
-                  ? "text-white font-semibold"
-                  : "text-zinc-400 hover:text-white"
+                  ? "text-foreground font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
               )}
             >
               {link.label}
             </Link>
 
           ))}
+
+          <ThemeToggle />
 
           <Button
             onClick={handleLogout}

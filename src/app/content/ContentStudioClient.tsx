@@ -233,18 +233,18 @@ export default function ContentStudioClient() {
 
   return (
 
-    <main className="min-h-screen bg-black text-white">
+    <main className="min-h-screen bg-background text-foreground">
 
       <div className="max-w-7xl mx-auto px-6 py-16">
 
         <div>
           <h1 className="text-4xl font-bold">Content Studio</h1>
-          <p className="text-zinc-400 mt-2">
+          <p className="text-muted-foreground mt-2">
             Saved content ideas from your audits — edit, track, and manage them here.
           </p>
         </div>
 
-        <Card className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 mt-8">
+        <Card className="rounded-2xl border border-border bg-card p-6 mt-8">
 
           <div className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
 
@@ -307,11 +307,11 @@ export default function ContentStudioClient() {
 
         {loading ? (
 
-          <p className="text-zinc-500 mt-10">Loading…</p>
+          <p className="text-muted-foreground mt-10">Loading…</p>
 
         ) : filteredItems.length === 0 ? (
 
-          <div className="mt-10 rounded-2xl border border-zinc-800 bg-zinc-950 p-8 text-center text-zinc-400">
+          <div className="mt-10 rounded-2xl border border-border bg-card p-8 text-center text-muted-foreground">
             {items.length === 0
               ? "No saved content yet — save ideas from an audit's AI Marketing Copilot tabs to see them here."
               : "No content items match your filters."}
@@ -323,7 +323,7 @@ export default function ContentStudioClient() {
 
             <div className="flex items-center gap-3 mt-8">
 
-              <label className="flex items-center gap-2 text-sm text-zinc-400">
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">
                 <input
                   type="checkbox"
                   checked={
@@ -331,7 +331,7 @@ export default function ContentStudioClient() {
                     filteredItems.length > 0
                   }
                   onChange={toggleSelectAll}
-                  className="h-4 w-4 rounded border-zinc-700 bg-black accent-violet-500"
+                  className="h-4 w-4 rounded border-border bg-background accent-violet-500"
                 />
                 Select all
               </label>
@@ -339,7 +339,7 @@ export default function ContentStudioClient() {
               {selectedIds.size > 0 && (
 
                 <>
-                  <span className="text-sm text-zinc-500">
+                  <span className="text-sm text-muted-foreground">
                     {selectedIds.size} selected
                   </span>
 
@@ -367,8 +367,8 @@ export default function ContentStudioClient() {
                   key={item.id}
                   className={`rounded-xl border p-5 cursor-pointer transition ${
                     selectedIds.has(item.id)
-                      ? "border-violet-500/50 bg-zinc-900"
-                      : "border-zinc-800 bg-zinc-950 hover:border-zinc-700"
+                      ? "border-violet-500/50 bg-card"
+                      : "border-border bg-card hover:border-muted-foreground/30"
                   }`}
                   onClick={() => {
                     setActiveItem(item)
@@ -392,7 +392,7 @@ export default function ContentStudioClient() {
                       checked={selectedIds.has(item.id)}
                       onClick={(e) => e.stopPropagation()}
                       onChange={() => toggleSelected(item.id)}
-                      className="h-4 w-4 rounded border-zinc-700 bg-black accent-violet-500 mt-0.5"
+                      className="h-4 w-4 rounded border-border bg-background accent-violet-500 mt-0.5"
                     />
 
                   </div>
@@ -401,13 +401,13 @@ export default function ContentStudioClient() {
                     {item.title}
                   </h3>
 
-                  <div className="flex items-center justify-between mt-4 text-xs text-zinc-500">
+                  <div className="flex items-center justify-between mt-4 text-xs text-muted-foreground">
 
                     {item.audit_id ? (
                       <Link
                         href={`/audit/${item.audit_id}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="hover:text-zinc-300 truncate"
+                        className="hover:text-foreground truncate"
                       >
                         {item.site_url || "Source audit"}
                       </Link>

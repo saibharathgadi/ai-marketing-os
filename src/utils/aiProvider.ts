@@ -111,6 +111,83 @@ async function generateWithOpenAI(
   return JSON.parse(content)
 }
 
+/**
+ * Best-effort live research via Gemini's Google Search grounding tool.
+ * Used to ground factual claims (current company names/ownership,
+ * competitor landscape) in real, current web results instead of the
+ * model's own training data, which can go stale (e.g. asserting an
+ * outdated corporate parent after a spinoff).
+ *
+ * Deliberately a separate call rather than folded into
+ * generateStructuredJSON: the Gemini API does not support combining the
+ * `google_search` tool with `responseMimeType: "application/json"` in a
+ * single request, so grounding requires its own plain-text call whose
+ * output is then fed as context into the structured-JSON call. Gemini
+ * free-tier only (no Google Search grounding equivalent for OpenAI here);
+ * returns null on any failure so callers can proceed without it.
+ */
+export async function generateGroundedResearch(
+  query: string
+): Promise<string | null> {
+  const apiKey = process.env.GEMINI_API_KEY
+
+  if (!apiKey) {
+    return null
+  }
+
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 20_000)
+
+    let response: Response
+
+    try {
+      response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: "user",
+                parts: [{ text: query }]
+              }
+            ],
+            tools: [{ google_search: {} }],
+            generationConfig: {
+              temperature: 0.3
+            }
+          }),
+          signal: controller.signal
+        }
+      )
+    } finally {
+      clearTimeout(timeout)
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        `Gemini grounded research request failed with status ${response.status}`
+      )
+    }
+
+    const data = await response.json()
+
+    const text = (data.candidates?.[0]?.content?.parts ?? [])
+      .map((part: { text?: string }) => part.text ?? "")
+      .join("")
+      .trim()
+
+    return text || null
+  } catch (error) {
+    console.error("Gemini grounded research failed:", error)
+    return null
+  }
+}
+
 export type AIProviderSource = "gemini" | "openai" | "fallback"
 
 export async function generateStructuredJSON(

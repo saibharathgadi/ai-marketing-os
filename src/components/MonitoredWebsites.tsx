@@ -343,7 +343,7 @@ export default function MonitoredWebsites({
 
   return (
 
-    <Card className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 mt-10">
+    <Card className="rounded-2xl border border-border bg-card p-6 mt-10">
 
       <div className="flex items-center justify-between gap-4 flex-wrap">
 
@@ -353,7 +353,7 @@ export default function MonitoredWebsites({
             Monitored Websites
           </h2>
 
-          <p className="text-zinc-400 mt-2">
+          <p className="text-muted-foreground mt-2">
             Save websites for recurring audits.
           </p>
 
@@ -385,7 +385,7 @@ export default function MonitoredWebsites({
           onChange={(e) =>
             setUrl(e.target.value)
           }
-          className="flex-1 rounded-xl bg-black border border-zinc-700 px-5 py-4 outline-none focus:border-violet-500"
+          className="flex-1 rounded-xl bg-background border border-border px-5 py-4 outline-none focus:border-violet-500"
         />
 
         <input
@@ -397,7 +397,7 @@ export default function MonitoredWebsites({
               e.target.value
             )
           }
-          className="flex-1 rounded-xl bg-black border border-zinc-700 px-5 py-4 outline-none focus:border-violet-500"
+          className="flex-1 rounded-xl bg-background border border-border px-5 py-4 outline-none focus:border-violet-500"
         />
 
         <Button
@@ -416,13 +416,13 @@ export default function MonitoredWebsites({
 
       </div>
 
-      <p className="text-zinc-500 text-sm mt-3">
+      <p className="text-muted-foreground text-sm mt-3">
         If a notification email is set, you&apos;ll get an alert when a scheduled audit detects a warning or critical SEO regression.
       </p>
 
       {statusMessage && (
 
-        <div className="mt-5 rounded-xl border border-zinc-800 bg-zinc-950 p-4 text-sm text-zinc-300">
+        <div className="mt-5 rounded-xl border border-border bg-background p-4 text-sm text-foreground">
           {statusMessage}
         </div>
 
@@ -432,7 +432,7 @@ export default function MonitoredWebsites({
 
         {websites.length === 0 ? (
 
-          <div className="rounded-xl bg-zinc-950 p-5 text-zinc-400">
+          <div className="rounded-xl bg-background p-5 text-muted-foreground">
             No monitored websites yet.
           </div>
 
@@ -442,12 +442,12 @@ export default function MonitoredWebsites({
 
             <div
               key={website.id}
-              className="rounded-xl bg-zinc-950 p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+              className="rounded-xl bg-background p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4"
             >
 
               <div>
 
-                <p className="text-zinc-400 text-sm">
+                <p className="text-muted-foreground text-sm">
                   Website
                 </p>
 
@@ -455,7 +455,7 @@ export default function MonitoredWebsites({
                   {website.url}
                 </h3>
 
-                <p className="text-zinc-500 text-sm mt-2">
+                <p className="text-muted-foreground text-sm mt-2">
 
                   Last audited:
                   {" "}
@@ -468,7 +468,7 @@ export default function MonitoredWebsites({
 
                 <div className="mt-3 flex flex-wrap gap-2 text-xs">
 
-                  <span className="rounded-lg bg-zinc-900 px-3 py-2 text-zinc-400">
+                  <span className="rounded-lg bg-card px-3 py-2 text-muted-foreground">
                     Duration:{" "}
                     {formatDuration(
                       website.last_audit_duration_ms

@@ -46,8 +46,11 @@ type QueueMetrics = {
   failedByReason?: Record<string, number>
 }
 
-const axisColor = "#71717a"
-const gridColor = "#27272f"
+// CSS custom properties (not Tailwind classes) since Recharts renders raw
+// SVG/inline-style props — the browser resolves these live against
+// whichever [data-theme] is active, so the chart re-themes automatically.
+const axisColor = "var(--muted-foreground)"
+const gridColor = "var(--border)"
 const scoreColor = "#60a5fa"
 const issuesColor = "#f87171"
 const pagesColor = "#34d399"
@@ -196,7 +199,7 @@ function getAlertClasses(
     return "border-green-500/20 bg-green-500/10 text-green-200"
   }
 
-  return "border-zinc-700 bg-zinc-950 text-zinc-300"
+  return "border-border bg-muted text-muted-foreground"
 }
 
 function TrendSummaryCard({
@@ -210,9 +213,9 @@ function TrendSummaryCard({
 }) {
   return (
 
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
+    <div className="rounded-2xl border border-border bg-card p-5">
 
-      <p className="text-zinc-500 text-sm">
+      <p className="text-muted-foreground text-sm">
         {label}
       </p>
 
@@ -220,7 +223,7 @@ function TrendSummaryCard({
         {value}
       </h3>
 
-      <p className="text-zinc-500 text-sm mt-3">
+      <p className="text-muted-foreground text-sm mt-3">
         {detail}
       </p>
 
@@ -266,9 +269,9 @@ function QueueMetricCard({
 }) {
   return (
 
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
+    <div className="rounded-2xl border border-border bg-card p-5">
 
-      <p className="text-zinc-500 text-sm">
+      <p className="text-muted-foreground text-sm">
         {label}
       </p>
 
@@ -276,7 +279,7 @@ function QueueMetricCard({
         {value}
       </h3>
 
-      <p className="text-zinc-500 text-sm mt-3">
+      <p className="text-muted-foreground text-sm mt-3">
         {detail}
       </p>
 
@@ -298,7 +301,7 @@ function ChartPanel({
 }) {
   return (
 
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
+    <div className="rounded-2xl border border-border bg-card p-6">
 
       <h3 className="text-xl font-semibold">
         {title}
@@ -345,13 +348,13 @@ function ChartPanel({
             <Tooltip
               contentStyle={{
                 background:
-                  "#09090b",
+                  "var(--popover)",
                 border:
-                  "1px solid #27272f",
+                  "1px solid var(--border)",
                 borderRadius:
                   "12px",
                 color:
-                  "#fafafa"
+                  "var(--popover-foreground)"
               }}
               labelFormatter={(
                 _label,
@@ -456,7 +459,7 @@ export default function DashboardCharts({
             Historical Analytics
           </h2>
 
-          <p className="text-zinc-400 mt-2 break-all">
+          <p className="text-muted-foreground mt-2 break-all">
             {latestAudit
               ? `Audit-to-audit SEO movement for ${latestAudit.url}, your most recently audited site.`
               : "Audit-to-audit SEO movement across saved reports."}
@@ -476,7 +479,7 @@ export default function DashboardCharts({
 
       {!regression.hasEnoughHistory && (
 
-        <div className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-900 p-5 text-zinc-400">
+        <div className="mt-6 rounded-2xl border border-border bg-card p-5 text-muted-foreground">
           Run at least two audits to unlock regression detection.
         </div>
 
@@ -543,7 +546,7 @@ export default function DashboardCharts({
             Crawl Diagnostics
           </h3>
 
-          <p className="text-zinc-500 text-sm">
+          <p className="text-muted-foreground text-sm">
             Runtime health, duration, and failure signals.
           </p>
 
@@ -606,7 +609,7 @@ export default function DashboardCharts({
             Regression Alerts
           </h3>
 
-          <p className="text-zinc-500 text-sm">
+          <p className="text-muted-foreground text-sm">
             {regression.summary}
           </p>
 

@@ -98,8 +98,8 @@ function SectionCard({
   children: React.ReactNode
 }) {
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-5">
-      <h3 className="text-sm font-semibold text-zinc-200 mb-3">{title}</h3>
+    <div className="rounded-xl border border-border bg-background p-5">
+      <h3 className="text-sm font-semibold text-foreground mb-3">{title}</h3>
       {children}
     </div>
   )
@@ -107,7 +107,7 @@ function SectionCard({
 
 function EmptyState({ label }: { label: string }) {
   return (
-    <p className="text-sm text-zinc-500">
+    <p className="text-muted-foreground text-sm">
       No {label} generated for this audit yet.
     </p>
   )
@@ -129,7 +129,7 @@ export default function AuditCopilotTabs({
   )
 
   return (
-    <section className="mt-10 rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
+    <section className="mt-10 rounded-2xl border border-border bg-card p-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <h2 className="text-3xl font-bold">AI Marketing Copilot</h2>
         <Badge variant={aiInsights.source === "ai" ? "default" : "outline"}>
@@ -140,7 +140,7 @@ export default function AuditCopilotTabs({
       </div>
 
       <Tabs defaultValue="overview" className="mt-6">
-        <TabsList variant="line" className="border-b border-zinc-800 pb-0">
+        <TabsList variant="line" className="border-b border-border pb-0">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="content">Content & Blog</TabsTrigger>
           <TabsTrigger value="social">Social</TabsTrigger>
@@ -152,13 +152,13 @@ export default function AuditCopilotTabs({
 
         <TabsContent value="overview" className="mt-5 space-y-4">
           <SectionCard title="Executive Summary">
-            <p className="text-sm text-zinc-300">
+            <p className="text-sm text-foreground">
               {aiInsights.executiveSummary}
             </p>
           </SectionCard>
 
           <SectionCard title="Weekly Focus">
-            <p className="text-sm text-zinc-300">{aiInsights.weeklyFocus}</p>
+            <p className="text-sm text-foreground">{aiInsights.weeklyFocus}</p>
           </SectionCard>
 
           <SectionCard title="Priority Actions">
@@ -170,10 +170,10 @@ export default function AuditCopilotTabs({
                       {action.severity}
                     </Badge>
                     <div>
-                      <p className="text-sm font-medium text-zinc-100">
+                      <p className="text-sm font-medium text-foreground">
                         {action.title}
                       </p>
-                      <p className="text-xs text-zinc-500 mt-0.5">
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         {action.reason}
                       </p>
                     </div>
@@ -190,7 +190,7 @@ export default function AuditCopilotTabs({
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-left text-xs text-zinc-500 border-b border-zinc-800">
+                    <tr className="text-left text-xs text-muted-foreground border-b border-border">
                       <th className="pb-2 pr-4 font-medium">Issue</th>
                       <th className="pb-2 pr-4 font-medium">Type</th>
                       <th className="pb-2 font-medium">Severity</th>
@@ -200,12 +200,12 @@ export default function AuditCopilotTabs({
                     {aiInsights.rootCauseSummary.map((row, index) => (
                       <tr
                         key={index}
-                        className="border-b border-zinc-900 last:border-0"
+                        className="border-b border-border last:border-0"
                       >
-                        <td className="py-2 pr-4 text-zinc-200">
+                        <td className="py-2 pr-4 text-foreground">
                           {row.issue}
                         </td>
-                        <td className="py-2 pr-4 text-zinc-500">
+                        <td className="py-2 pr-4 text-muted-foreground">
                           {row.type}
                         </td>
                         <td className="py-2">
@@ -226,15 +226,15 @@ export default function AuditCopilotTabs({
           <SectionCard title="Marketing Opportunities & Themes">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <p className="text-xs text-zinc-500 mb-2">Opportunities</p>
-                <ul className="space-y-1.5 text-sm text-zinc-300 list-disc list-inside">
+                <p className="text-xs text-muted-foreground mb-2">Opportunities</p>
+                <ul className="space-y-1.5 text-sm text-foreground list-disc list-inside">
                   {aiInsights.marketingOpportunities?.map((item, index) => (
                     <li key={index}>{item}</li>
                   ))}
                 </ul>
               </div>
               <div>
-                <p className="text-xs text-zinc-500 mb-2">Detected Themes</p>
+                <p className="text-xs text-muted-foreground mb-2">Detected Themes</p>
                 <div className="flex flex-wrap gap-2">
                   {aiInsights.detectedThemes?.length ? (
                     aiInsights.detectedThemes.map((theme, index) => (
@@ -243,7 +243,7 @@ export default function AuditCopilotTabs({
                       </Badge>
                     ))
                   ) : (
-                    <span className="text-sm text-zinc-500">
+                    <span className="text-sm text-muted-foreground">
                       No themes detected.
                     </span>
                   )}
@@ -260,11 +260,11 @@ export default function AuditCopilotTabs({
                 {contentIdeas.map((idea, index) => (
                   <div
                     key={index}
-                    className="rounded-lg border border-zinc-800 bg-zinc-900 p-3"
+                    className="rounded-lg border border-border bg-card p-3"
                   >
                     <Badge variant="secondary">{idea.type}</Badge>
                     <p className="text-sm font-medium mt-2">{idea.title}</p>
-                    <p className="text-xs text-zinc-500 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       {idea.description}
                     </p>
                     <div className="mt-3">
@@ -296,19 +296,19 @@ export default function AuditCopilotTabs({
                 {aiInsights.blogSeries.map((series, index) => (
                   <div
                     key={index}
-                    className="rounded-lg border border-zinc-800 bg-zinc-900 p-4"
+                    className="rounded-lg border border-border bg-card p-4"
                   >
                     <p className="text-sm font-semibold">
                       {series.seriesTitle}
                     </p>
-                    <p className="text-xs text-zinc-500 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       {series.description}
                     </p>
-                    <ol className="mt-3 space-y-1.5 text-sm text-zinc-300 list-decimal list-inside">
+                    <ol className="mt-3 space-y-1.5 text-sm text-foreground list-decimal list-inside">
                       {series.posts?.map((post, postIndex) => (
                         <li key={postIndex}>
                           {post.title}{" "}
-                          <span className="text-zinc-500">
+                          <span className="text-muted-foreground">
                             — {post.angle}
                           </span>
                         </li>
@@ -342,7 +342,7 @@ export default function AuditCopilotTabs({
                 {aiInsights.socialIdeas.map((idea, index) => (
                   <div
                     key={index}
-                    className="rounded-lg border border-zinc-800 bg-zinc-900 p-3"
+                    className="rounded-lg border border-border bg-card p-3"
                   >
                     <Badge variant="secondary">{idea.platform}</Badge>
                     <p className="text-sm mt-2">{idea.idea}</p>
@@ -369,7 +369,7 @@ export default function AuditCopilotTabs({
                 {aiInsights.socialSeries.map((series, index) => (
                   <div
                     key={index}
-                    className="rounded-lg border border-zinc-800 bg-zinc-900 p-4"
+                    className="rounded-lg border border-border bg-card p-4"
                   >
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary">{series.platform}</Badge>
@@ -380,10 +380,10 @@ export default function AuditCopilotTabs({
                     <ul className="mt-3 space-y-2">
                       {series.posts?.map((post, postIndex) => (
                         <li key={postIndex} className="text-sm">
-                          <span className="font-medium text-zinc-100">
+                          <span className="font-medium text-foreground">
                             {post.hook}
                           </span>
-                          <p className="text-xs text-zinc-500 mt-0.5">
+                          <p className="text-xs text-muted-foreground mt-0.5">
                             {post.caption}
                           </p>
                         </li>
@@ -417,19 +417,19 @@ export default function AuditCopilotTabs({
                 {aiInsights.adCampaigns.map((campaign, index) => (
                   <div
                     key={index}
-                    className="rounded-lg border border-zinc-800 bg-zinc-900 p-4"
+                    className="rounded-lg border border-border bg-card p-4"
                   >
                     <p className="text-sm font-semibold">{campaign.name}</p>
-                    <p className="text-xs text-zinc-500 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       {campaign.objective}
                     </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 text-sm text-zinc-300">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 text-sm text-foreground">
                       <p>
-                        <span className="text-zinc-500">Audience: </span>
+                        <span className="text-muted-foreground">Audience: </span>
                         {campaign.targetAudience}
                       </p>
                       <p>
-                        <span className="text-zinc-500">Key message: </span>
+                        <span className="text-muted-foreground">Key message: </span>
                         {campaign.keyMessage}
                       </p>
                     </div>
@@ -468,21 +468,21 @@ export default function AuditCopilotTabs({
                 {aiInsights.adSets.map((adSet, index) => (
                   <div
                     key={index}
-                    className="rounded-lg border border-zinc-800 bg-zinc-900 p-4 text-sm"
+                    className="rounded-lg border border-border bg-card p-4 text-sm"
                   >
-                    <p className="font-medium text-zinc-100">
+                    <p className="font-medium text-foreground">
                       {adSet.campaignName}
                     </p>
-                    <p className="text-zinc-400 mt-2">
-                      <span className="text-zinc-500">Audience angle: </span>
+                    <p className="text-muted-foreground mt-2">
+                      <span className="text-muted-foreground">Audience angle: </span>
                       {adSet.audienceAngle}
                     </p>
-                    <p className="text-zinc-400 mt-1">
-                      <span className="text-zinc-500">Creative angle: </span>
+                    <p className="text-muted-foreground mt-1">
+                      <span className="text-muted-foreground">Creative angle: </span>
                       {adSet.creativeAngle}
                     </p>
-                    <p className="text-zinc-400 mt-1">
-                      <span className="text-zinc-500">Budget split: </span>
+                    <p className="text-muted-foreground mt-1">
+                      <span className="text-muted-foreground">Budget split: </span>
                       {adSet.suggestedBudgetSplit}
                     </p>
                     <div className="mt-3">
@@ -514,25 +514,25 @@ export default function AuditCopilotTabs({
                 {aiInsights.landingPageIdeas.map((page, index) => (
                   <div
                     key={index}
-                    className="rounded-lg border border-zinc-800 bg-zinc-900 p-4"
+                    className="rounded-lg border border-border bg-card p-4"
                   >
                     <p className="text-sm font-semibold">{page.title}</p>
-                    <p className="text-xs text-zinc-500 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       {page.targetOffer}
                     </p>
                     <div className="mt-3 space-y-2">
                       {page.sections?.map((section, sectionIndex) => (
                         <div
                           key={sectionIndex}
-                          className="rounded-md bg-zinc-950 border border-zinc-800 p-3"
+                          className="rounded-md bg-background border border-border p-3"
                         >
-                          <p className="text-sm font-medium text-zinc-100">
+                          <p className="text-sm font-medium text-foreground">
                             {section.name}
                           </p>
-                          <p className="text-xs text-zinc-500 mt-1">
+                          <p className="text-xs text-muted-foreground mt-1">
                             {section.purpose}
                           </p>
-                          <p className="text-xs text-zinc-400 mt-1 italic">
+                          <p className="text-xs text-muted-foreground mt-1 italic">
                             &ldquo;{section.copyHint}&rdquo;
                           </p>
                         </div>
@@ -566,7 +566,7 @@ export default function AuditCopilotTabs({
                 {aiInsights.keywordClusters.map((cluster, index) => (
                   <div
                     key={index}
-                    className="rounded-lg border border-zinc-800 bg-zinc-900 p-4"
+                    className="rounded-lg border border-border bg-card p-4"
                   >
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                       <p className="text-sm font-semibold">
@@ -585,8 +585,8 @@ export default function AuditCopilotTabs({
                         )
                       )}
                     </div>
-                    <p className="text-xs text-zinc-500 mt-3">
-                      <span className="text-zinc-400">SERP target: </span>
+                    <p className="text-xs text-muted-foreground mt-3">
+                      <span className="text-muted-foreground">SERP target: </span>
                       {cluster.serpTarget}
                     </p>
                     <div className="mt-3">
@@ -624,12 +624,12 @@ export default function AuditCopilotTabs({
                 ].map((phase) => (
                   <div
                     key={phase.label}
-                    className="rounded-lg border border-zinc-800 bg-zinc-900 p-4"
+                    className="rounded-lg border border-border bg-card p-4"
                   >
                     <p className="text-xs font-semibold text-violet-400 uppercase tracking-wide mb-2">
                       {phase.label}
                     </p>
-                    <ul className="space-y-2 text-sm text-zinc-300 list-disc list-inside">
+                    <ul className="space-y-2 text-sm text-foreground list-disc list-inside">
                       {(phase.items ?? []).map((item, index) => (
                         <li key={index}>{item}</li>
                       ))}
@@ -647,7 +647,7 @@ export default function AuditCopilotTabs({
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-left text-xs text-zinc-500 border-b border-zinc-800">
+                    <tr className="text-left text-xs text-muted-foreground border-b border-border">
                       <th className="pb-2 pr-4 font-medium">Area</th>
                       <th className="pb-2 pr-4 font-medium">Metric</th>
                       <th className="pb-2 pr-4 font-medium">Baseline</th>
@@ -658,18 +658,18 @@ export default function AuditCopilotTabs({
                     {aiInsights.kpiFramework.map((kpi, index) => (
                       <tr
                         key={index}
-                        className="border-b border-zinc-900 last:border-0"
+                        className="border-b border-border last:border-0"
                       >
                         <td className="py-2 pr-4">
                           <Badge variant="outline">{kpi.area}</Badge>
                         </td>
-                        <td className="py-2 pr-4 text-zinc-200">
+                        <td className="py-2 pr-4 text-foreground">
                           {kpi.metric}
                         </td>
-                        <td className="py-2 pr-4 text-zinc-500">
+                        <td className="py-2 pr-4 text-muted-foreground">
                           {kpi.baseline}
                         </td>
-                        <td className="py-2 text-zinc-200">{kpi.target}</td>
+                        <td className="py-2 text-foreground">{kpi.target}</td>
                       </tr>
                     ))}
                   </tbody>

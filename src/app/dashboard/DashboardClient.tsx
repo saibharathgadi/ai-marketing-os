@@ -101,7 +101,7 @@ function EngineScorePill({
 }) {
   if (!engine || typeof engine.score !== "number") {
     return (
-      <Badge variant="outline" className="text-zinc-500">
+      <Badge variant="outline" className="text-muted-foreground">
         {label}: n/a
       </Badge>
     )
@@ -136,27 +136,27 @@ function AuditCardSkeleton() {
   return (
 
     <div
-      className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 animate-pulse"
+      className="rounded-2xl border border-border bg-card p-6 animate-pulse"
       aria-hidden="true"
     >
 
-      <div className="h-3 w-16 rounded bg-zinc-800" />
+      <div className="h-3 w-16 rounded bg-muted" />
 
-      <div className="h-5 w-3/4 rounded bg-zinc-800 mt-3" />
+      <div className="h-5 w-3/4 rounded bg-muted mt-3" />
 
       <div className="grid grid-cols-3 gap-4 mt-8">
 
-        <div className="h-8 rounded bg-zinc-800" />
+        <div className="h-8 rounded bg-muted" />
 
-        <div className="h-8 rounded bg-zinc-800" />
+        <div className="h-8 rounded bg-muted" />
 
-        <div className="h-8 rounded bg-zinc-800" />
+        <div className="h-8 rounded bg-muted" />
 
       </div>
 
-      <div className="h-3 w-1/3 rounded bg-zinc-800 mt-8" />
+      <div className="h-3 w-1/3 rounded bg-muted mt-8" />
 
-      <div className="h-16 rounded-xl bg-zinc-950 mt-6" />
+      <div className="h-16 rounded-xl bg-background mt-6" />
 
     </div>
 
@@ -542,7 +542,12 @@ export default function DashboardClient() {
 
   return (
 
-    <main className="min-h-screen bg-black text-white">
+    <main className="relative min-h-screen bg-background text-foreground">
+
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[480px] bg-[image:var(--gradient-glow)]"
+      />
 
       <div className="max-w-7xl mx-auto px-6 py-12">
 
@@ -554,7 +559,7 @@ export default function DashboardClient() {
               Dashboard
             </h1>
 
-            <p className="text-zinc-400 mt-3">
+            <p className="text-muted-foreground mt-3">
               Marketing health, ideas, and audit history across your sites.
             </p>
 
@@ -581,10 +586,10 @@ export default function DashboardClient() {
 
               <Card
                 key={metric.label}
-                className="border border-zinc-800 bg-zinc-900 px-6 py-5"
+                className="border border-border bg-card px-6 py-5"
               >
 
-                <p className="text-zinc-500 text-xs uppercase tracking-wide">
+                <p className="text-muted-foreground text-xs uppercase tracking-wide">
                   Avg {metric.label}
                 </p>
 
@@ -602,7 +607,7 @@ export default function DashboardClient() {
 
         {latestIdeas && (
 
-          <Card className="mt-8 border border-zinc-800 bg-zinc-900 p-6">
+          <Card className="mt-8 border border-border bg-card p-6">
 
             <div className="flex items-center justify-between gap-4 flex-wrap">
 
@@ -619,7 +624,7 @@ export default function DashboardClient() {
 
             </div>
 
-            <p className="text-zinc-500 text-sm mt-1 break-all">
+            <p className="text-muted-foreground text-sm mt-1 break-all">
               {latestIdeas.url}
             </p>
 
@@ -627,12 +632,12 @@ export default function DashboardClient() {
 
               {latestIdeas.blogIdea && (
 
-                <div className="rounded-xl bg-zinc-950 border border-zinc-800 p-4">
+                <div className="rounded-xl bg-background border border-border p-4">
                   <Badge variant="secondary">Blog</Badge>
                   <p className="text-sm font-medium mt-2">
                     {latestIdeas.blogIdea.title}
                   </p>
-                  <p className="text-xs text-zinc-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     {latestIdeas.blogIdea.description}
                   </p>
                 </div>
@@ -641,7 +646,7 @@ export default function DashboardClient() {
 
               {latestIdeas.socialIdea && (
 
-                <div className="rounded-xl bg-zinc-950 border border-zinc-800 p-4">
+                <div className="rounded-xl bg-background border border-border p-4">
                   <Badge variant="secondary">
                     {latestIdeas.socialIdea.platform}
                   </Badge>
@@ -654,12 +659,12 @@ export default function DashboardClient() {
 
               {latestIdeas.adCampaign && (
 
-                <div className="rounded-xl bg-zinc-950 border border-zinc-800 p-4">
+                <div className="rounded-xl bg-background border border-border p-4">
                   <Badge variant="secondary">Ad Campaign</Badge>
                   <p className="text-sm font-medium mt-2">
                     {latestIdeas.adCampaign.name}
                   </p>
-                  <p className="text-xs text-zinc-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     {latestIdeas.adCampaign.objective}
                   </p>
                 </div>
@@ -699,7 +704,7 @@ export default function DashboardClient() {
 
         ) : audits.length === 0 ? (
 
-          <div className="mt-12 rounded-2xl border border-zinc-800 bg-zinc-900 p-8">
+          <div className="mt-12 rounded-2xl border border-border bg-card p-8">
 
             <h2 className="text-2xl font-semibold">
               No audits yet
@@ -713,7 +718,7 @@ export default function DashboardClient() {
 
             <div className="flex items-center justify-between gap-4 mt-12 flex-wrap">
 
-              <label className="flex items-center gap-2 text-sm text-zinc-400 cursor-pointer select-none">
+              <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={
@@ -721,7 +726,7 @@ export default function DashboardClient() {
                     selectedAuditIds.size === audits.length
                   }
                   onChange={toggleSelectAll}
-                  className="h-4 w-4 rounded border-zinc-700 bg-black accent-violet-500"
+                  className="h-4 w-4 rounded border-border bg-background accent-violet-500"
                 />
                 {selectedAuditIds.size > 0
                   ? `${selectedAuditIds.size} selected`
@@ -751,8 +756,8 @@ export default function DashboardClient() {
                 key={audit.id}
                 className={`rounded-2xl border p-6 transition ${
                   selectedAuditIds.has(audit.id)
-                    ? "border-violet-500/50 bg-zinc-900"
-                    : "border-zinc-800 bg-zinc-900"
+                    ? "border-violet-500/50 bg-card"
+                    : "border-border bg-card"
                 }`}
               >
 
@@ -767,7 +772,7 @@ export default function DashboardClient() {
                         toggleAuditSelected(audit.id)
                       }
                       aria-label={`Select audit for ${audit.url}`}
-                      className="h-4 w-4 mt-1 rounded border-zinc-700 bg-black accent-violet-500 shrink-0"
+                      className="h-4 w-4 mt-1 rounded border-border bg-background accent-violet-500 shrink-0"
                     />
 
                     <Link
@@ -775,7 +780,7 @@ export default function DashboardClient() {
                       className="flex-1 min-w-0"
                     >
 
-                      <p className="text-zinc-400 text-sm">
+                      <p className="text-muted-foreground text-sm">
                         Website
                       </p>
 
@@ -795,7 +800,7 @@ export default function DashboardClient() {
                     }
                     aria-label={`Delete audit for ${audit.url}`}
                     title="Delete audit"
-                    className="text-zinc-500 hover:text-red-400 transition text-xl shrink-0"
+                    className="text-muted-foreground hover:text-red-400 transition text-xl shrink-0"
                   >
                     ✕
                   </button>
@@ -806,7 +811,7 @@ export default function DashboardClient() {
 
                   <div>
 
-                    <p className="text-zinc-500 text-xs">
+                    <p className="text-muted-foreground text-xs">
                       Score
                     </p>
 
@@ -818,7 +823,7 @@ export default function DashboardClient() {
 
                   <div>
 
-                    <p className="text-zinc-500 text-xs">
+                    <p className="text-muted-foreground text-xs">
                       Pages
                     </p>
 
@@ -830,7 +835,7 @@ export default function DashboardClient() {
 
                   <div>
 
-                    <p className="text-zinc-500 text-xs">
+                    <p className="text-muted-foreground text-xs">
                       Issues
                     </p>
 
@@ -857,7 +862,7 @@ export default function DashboardClient() {
                   />
                 </div>
 
-                <p className="text-zinc-500 text-sm mt-4">
+                <p className="text-muted-foreground text-sm mt-4">
                   {formatLocalTimestamp(
                     audit.created_at
                   )}
@@ -865,15 +870,15 @@ export default function DashboardClient() {
 
                 {audit.ai_insights ? (
 
-                  <div className="mt-6 rounded-xl border border-zinc-800 bg-zinc-950 p-4 space-y-4">
+                  <div className="mt-6 rounded-xl border border-border bg-background p-4 space-y-4">
 
                     <div>
 
-                      <h3 className="text-sm font-semibold text-white">
+                      <h3 className="text-sm font-semibold text-foreground">
                         AI Executive Summary
                       </h3>
 
-                      <p className="text-sm text-zinc-400 mt-2">
+                      <p className="text-sm text-muted-foreground mt-2">
                         {
                           audit.ai_insights
                             .executiveSummary
@@ -884,11 +889,11 @@ export default function DashboardClient() {
 
                     <div>
 
-                      <h4 className="text-sm font-medium text-white">
+                      <h4 className="text-sm font-medium text-foreground">
                         Weekly Focus
                       </h4>
 
-                      <p className="text-sm text-zinc-400 mt-2">
+                      <p className="text-sm text-muted-foreground mt-2">
                         {
                           audit.ai_insights
                             .weeklyFocus
@@ -907,11 +912,11 @@ export default function DashboardClient() {
 
                       <div>
 
-                        <h4 className="text-sm font-medium text-white mb-2">
+                        <h4 className="text-sm font-medium text-foreground mb-2">
                           Top Priorities
                         </h4>
 
-                        <ul className="space-y-2 text-sm text-zinc-300">
+                        <ul className="space-y-2 text-sm text-foreground">
 
                           {audit.ai_insights.priorityActions
                             .slice(0, 3)
@@ -938,7 +943,7 @@ export default function DashboardClient() {
 
                 ) : (
 
-                  <p className="mt-6 text-sm text-zinc-500">
+                  <p className="mt-6 text-sm text-muted-foreground">
                     AI insights not available for this audit.
                   </p>
 

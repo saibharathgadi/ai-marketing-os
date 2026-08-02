@@ -87,15 +87,20 @@ export default function LoginForm() {
 
   return (
 
-    <main className="min-h-screen bg-black text-white flex items-center justify-center">
+    <main className="relative min-h-screen bg-background text-foreground flex items-center justify-center overflow-hidden">
 
-      <Card className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900 p-8">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[image:var(--gradient-glow)]"
+      />
+
+      <Card className="w-full max-w-md rounded-2xl border border-border bg-card p-8">
 
         <h1 className="text-4xl font-bold">
           Login
         </h1>
 
-        <p className="text-zinc-400 mt-2">
+        <p className="text-muted-foreground mt-2">
           Access your marketing dashboard.
         </p>
 
@@ -108,7 +113,7 @@ export default function LoginForm() {
             onChange={(e) =>
               setEmail(e.target.value)
             }
-            className="w-full rounded-xl bg-black border border-zinc-800 px-4 py-3 outline-none focus:border-violet-500"
+            className="w-full rounded-xl bg-background border border-border px-4 py-3 outline-none focus:border-violet-500"
           />
 
           <input
@@ -118,7 +123,7 @@ export default function LoginForm() {
             onChange={(e) =>
               setPassword(e.target.value)
             }
-            className="w-full rounded-xl bg-black border border-zinc-800 px-4 py-3 outline-none focus:border-violet-500"
+            className="w-full rounded-xl bg-background border border-border px-4 py-3 outline-none focus:border-violet-500"
           />
 
         </div>

@@ -50,13 +50,13 @@ function HealthScoreCard({
   engine?: EngineScore
 }) {
   return (
-    <Card className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-      <p className="text-zinc-400 text-sm">{label}</p>
+    <Card className="rounded-2xl border border-border bg-card p-6">
+      <p className="text-muted-foreground text-sm">{label}</p>
       <h2 className="text-4xl font-bold mt-3 bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">
         {typeof engine?.score === "number" ? engine.score : "—"}
       </h2>
       {!engine && (
-        <p className="text-xs text-zinc-600 mt-2">Not yet analyzed</p>
+        <p className="text-xs text-muted-foreground mt-2">Not yet analyzed</p>
       )}
     </Card>
   )
@@ -109,7 +109,7 @@ function getAlertClasses(
     return "border-green-500/20 bg-green-500/10 text-green-200"
   }
 
-  return "border-zinc-700 bg-zinc-950 text-zinc-300"
+  return "border-border bg-background text-foreground"
 }
 
 function formatDelta(
@@ -255,7 +255,7 @@ export default async function AuditDetailPage({
 
   return (
 
-    <main className="min-h-screen bg-black text-white">
+    <main className="min-h-screen bg-background text-foreground">
 
       <div className="max-w-7xl mx-auto px-6 py-10">
 
@@ -265,7 +265,7 @@ export default async function AuditDetailPage({
 
             <Link
               href="/dashboard"
-              className="inline-flex items-center gap-1.5 text-sm text-zinc-400 hover:text-white transition"
+              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition"
             >
               ← Back to Dashboard
             </Link>
@@ -274,7 +274,7 @@ export default async function AuditDetailPage({
               Audit Details
             </h1>
 
-            <p className="text-zinc-400 mt-2 break-all">
+            <p className="text-muted-foreground mt-2 break-all">
               {currentAudit?.url}
             </p>
 
@@ -317,9 +317,9 @@ export default async function AuditDetailPage({
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
 
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
+          <div className="rounded-2xl border border-border bg-card p-6">
 
-            <p className="text-zinc-400 text-sm">
+            <p className="text-muted-foreground text-sm">
               Average SEO Score
             </p>
 
@@ -329,9 +329,9 @@ export default async function AuditDetailPage({
 
           </div>
 
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
+          <div className="rounded-2xl border border-border bg-card p-6">
 
-            <p className="text-zinc-400 text-sm">
+            <p className="text-muted-foreground text-sm">
               Pages Crawled
             </p>
 
@@ -341,9 +341,9 @@ export default async function AuditDetailPage({
 
           </div>
 
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
+          <div className="rounded-2xl border border-border bg-card p-6">
 
-            <p className="text-zinc-400 text-sm">
+            <p className="text-muted-foreground text-sm">
               Total Issues
             </p>
 
@@ -355,7 +355,7 @@ export default async function AuditDetailPage({
 
         </div>
 
-        <section className="mt-10 rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
+        <section className="mt-10 rounded-2xl border border-border bg-card p-6">
 
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
 
@@ -365,13 +365,13 @@ export default async function AuditDetailPage({
                 Regression Summary
               </h2>
 
-              <p className="text-zinc-400 mt-2 max-w-3xl">
+              <p className="text-muted-foreground mt-2 max-w-3xl">
                 {regression.summary}
               </p>
 
               {previousAudit && (
 
-                <p className="text-zinc-500 text-sm mt-3">
+                <p className="text-muted-foreground text-sm mt-3">
                   Compared with previous audit from{" "}
                   {formatLocalTimestamp(
                     previousAudit.created_at
@@ -394,8 +394,8 @@ export default async function AuditDetailPage({
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
 
-            <div className="rounded-xl bg-zinc-950 p-4">
-              <p className="text-zinc-500 text-sm">
+            <div className="rounded-xl bg-background p-4">
+              <p className="text-muted-foreground text-sm">
                 Score Change
               </p>
               <p className="text-2xl font-bold mt-2">
@@ -405,8 +405,8 @@ export default async function AuditDetailPage({
               </p>
             </div>
 
-            <div className="rounded-xl bg-zinc-950 p-4">
-              <p className="text-zinc-500 text-sm">
+            <div className="rounded-xl bg-background p-4">
+              <p className="text-muted-foreground text-sm">
                 Issue Change
               </p>
               <p className="text-2xl font-bold mt-2">
@@ -416,8 +416,8 @@ export default async function AuditDetailPage({
               </p>
             </div>
 
-            <div className="rounded-xl bg-zinc-950 p-4">
-              <p className="text-zinc-500 text-sm">
+            <div className="rounded-xl bg-background p-4">
+              <p className="text-muted-foreground text-sm">
                 Page Count Change
               </p>
               <p className="text-2xl font-bold mt-2">
@@ -462,10 +462,10 @@ export default async function AuditDetailPage({
 
             <div
               key={page.id}
-              className="rounded-2xl border border-zinc-800 bg-zinc-900 overflow-hidden"
+              className="rounded-2xl border border-border bg-card overflow-hidden"
             >
 
-              <div className="p-6 border-b border-zinc-800">
+              <div className="p-6 border-b border-border">
 
                 <div className="flex items-center justify-between gap-6">
 
@@ -475,7 +475,7 @@ export default async function AuditDetailPage({
                       {page.url}
                     </h2>
 
-                    <p className="text-zinc-500 mt-2">
+                    <p className="text-muted-foreground mt-2">
                       {page.title}
                     </p>
 
@@ -483,7 +483,7 @@ export default async function AuditDetailPage({
 
                   <div className="text-right">
 
-                    <p className="text-zinc-500 text-sm">
+                    <p className="text-muted-foreground text-sm">
                       SEO Score
                     </p>
 
@@ -503,11 +503,11 @@ export default async function AuditDetailPage({
 
                   <div>
 
-                    <p className="text-sm text-zinc-500 mb-2">
+                    <p className="text-sm text-muted-foreground mb-2">
                       Meta Description
                     </p>
 
-                    <div className="rounded-xl bg-zinc-950 p-4 text-zinc-300">
+                    <div className="rounded-xl bg-background p-4 text-foreground">
                       {page.meta_description ||
                         "No meta description"}
                     </div>
@@ -516,7 +516,7 @@ export default async function AuditDetailPage({
 
                   <div>
 
-                    <p className="text-sm text-zinc-500 mb-2">
+                    <p className="text-sm text-muted-foreground mb-2">
                       H1 Headings
                     </p>
 
@@ -530,7 +530,7 @@ export default async function AuditDetailPage({
 
                           <div
                             key={index}
-                            className="rounded-xl bg-zinc-950 p-3"
+                            className="rounded-xl bg-background p-3"
                           >
                             {heading}
                           </div>
@@ -544,7 +544,7 @@ export default async function AuditDetailPage({
 
                   <div>
 
-                    <p className="text-sm text-zinc-500 mb-2">
+                    <p className="text-sm text-muted-foreground mb-2">
                       H2 Headings
                     </p>
 
@@ -558,7 +558,7 @@ export default async function AuditDetailPage({
 
                           <div
                             key={index}
-                            className="rounded-xl bg-zinc-950 p-3"
+                            className="rounded-xl bg-background p-3"
                           >
                             {heading}
                           </div>
@@ -576,7 +576,7 @@ export default async function AuditDetailPage({
 
                   <div>
 
-                    <p className="text-sm text-zinc-500 mb-2">
+                    <p className="text-sm text-muted-foreground mb-2">
                       SEO Issues
                     </p>
 
@@ -614,7 +614,7 @@ export default async function AuditDetailPage({
 
                   <div>
 
-                    <p className="text-sm text-zinc-500 mb-2">
+                    <p className="text-sm text-muted-foreground mb-2">
                       AI Recommendations
                     </p>
 
@@ -626,11 +626,11 @@ export default async function AuditDetailPage({
 
                   <div>
 
-                    <p className="text-sm text-zinc-500 mb-2">
+                    <p className="text-sm text-muted-foreground mb-2">
                       Word Count
                     </p>
 
-                    <div className="rounded-xl bg-zinc-950 p-4">
+                    <div className="rounded-xl bg-background p-4">
                       {page.word_count}
                     </div>
 
