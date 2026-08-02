@@ -9,6 +9,7 @@ import MonitoredWebsites from "@/components/MonitoredWebsites"
 import { isMissingColumnError } from "@/utils/schemaCompat"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 
 type EngineScore = {
   score: number
@@ -174,6 +175,12 @@ export default function DashboardClient() {
 
   const [queueMetrics, setQueueMetrics] =
     useState(defaultQueueMetrics)
+
+  const [selectedAuditIds, setSelectedAuditIds] =
+    useState<Set<string>>(new Set())
+
+  const [bulkDeleting, setBulkDeleting] =
+    useState(false)
 
   const loadDiagnostics = useCallback(
     async () => {
@@ -382,6 +389,25 @@ export default function DashboardClient() {
     }
   }, [audits])
 
+  async function deleteAuditById(
+    auditId: string
+  ) {
+
+    const response =
+      await fetch(
+        `/api/audit/${auditId}`,
+        {
+          method: "DELETE"
+        }
+      )
+
+    const result =
+      await response.json()
+
+    return result.success as boolean
+
+  }
+
   async function handleDelete(
     auditId: string
   ) {
@@ -395,18 +421,10 @@ export default function DashboardClient() {
 
     try {
 
-      const response =
-        await fetch(
-          `/api/audit/${auditId}`,
-          {
-            method: "DELETE"
-          }
-        )
+      const success =
+        await deleteAuditById(auditId)
 
-      const result =
-        await response.json()
-
-      if (!result.success) {
+      if (!success) {
 
         alert("Failed to delete audit")
 
@@ -421,11 +439,102 @@ export default function DashboardClient() {
         )
       )
 
+      setSelectedAuditIds((prev) => {
+        const next = new Set(prev)
+        next.delete(auditId)
+        return next
+      })
+
     } catch (error) {
 
       console.error(error)
 
       alert("Something went wrong")
+
+    }
+
+  }
+
+  function toggleAuditSelected(
+    auditId: string
+  ) {
+
+    setSelectedAuditIds((prev) => {
+      const next = new Set(prev)
+
+      if (next.has(auditId)) {
+        next.delete(auditId)
+      } else {
+        next.add(auditId)
+      }
+
+      return next
+    })
+
+  }
+
+  function toggleSelectAll() {
+
+    setSelectedAuditIds((prev) =>
+      prev.size === audits.length
+        ? new Set()
+        : new Set(audits.map((audit) => audit.id))
+    )
+
+  }
+
+  async function handleBulkDelete() {
+
+    if (selectedAuditIds.size === 0) return
+
+    const confirmed =
+      confirm(
+        `Delete ${selectedAuditIds.size} selected audit${
+          selectedAuditIds.size === 1 ? "" : "s"
+        } permanently?`
+      )
+
+    if (!confirmed) return
+
+    setBulkDeleting(true)
+
+    try {
+
+      const idsToDelete = [...selectedAuditIds]
+
+      const results =
+        await Promise.all(
+          idsToDelete.map((id) =>
+            deleteAuditById(id).catch(() => false)
+          )
+        )
+
+      const deletedIds =
+        idsToDelete.filter((_, index) => results[index])
+
+      setAudits((prev) =>
+        prev.filter(
+          (audit) => !deletedIds.includes(audit.id)
+        )
+      )
+
+      setSelectedAuditIds(new Set())
+
+      if (deletedIds.length < idsToDelete.length) {
+        alert(
+          `Deleted ${deletedIds.length} of ${idsToDelete.length} audits. Some failed — please retry.`
+        )
+      }
+
+    } catch (error) {
+
+      console.error(error)
+
+      alert("Something went wrong deleting the selected audits.")
+
+    } finally {
+
+      setBulkDeleting(false)
 
     }
 
@@ -442,21 +551,20 @@ export default function DashboardClient() {
           <div>
 
             <h1 className="text-5xl font-bold">
-              Audit History
+              Dashboard
             </h1>
 
             <p className="text-zinc-400 mt-3">
-              View all SEO audits.
+              Marketing health, ideas, and audit history across your sites.
             </p>
 
           </div>
 
-          <Link
-            href="/"
-            className="rounded-xl bg-white text-black px-6 py-3 font-semibold"
-          >
-            ← Back Home
-          </Link>
+          <Button asChild size="lg" className="h-auto py-3 px-6">
+            <Link href="/">
+              + New Audit
+            </Link>
+          </Button>
 
         </div>
 
@@ -601,31 +709,83 @@ export default function DashboardClient() {
 
         ) : (
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mt-12">
+          <>
+
+            <div className="flex items-center justify-between gap-4 mt-12 flex-wrap">
+
+              <label className="flex items-center gap-2 text-sm text-zinc-400 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={
+                    selectedAuditIds.size > 0 &&
+                    selectedAuditIds.size === audits.length
+                  }
+                  onChange={toggleSelectAll}
+                  className="h-4 w-4 rounded border-zinc-700 bg-black accent-violet-500"
+                />
+                {selectedAuditIds.size > 0
+                  ? `${selectedAuditIds.size} selected`
+                  : "Select all"}
+              </label>
+
+              {selectedAuditIds.size > 0 && (
+                <Button
+                  onClick={handleBulkDelete}
+                  disabled={bulkDeleting}
+                  variant="destructive"
+                  size="sm"
+                >
+                  {bulkDeleting
+                    ? "Deleting…"
+                    : `Delete ${selectedAuditIds.size} selected`}
+                </Button>
+              )}
+
+            </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mt-4">
 
             {audits.map((audit) => (
 
               <div
                 key={audit.id}
-                className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6"
+                className={`rounded-2xl border p-6 transition ${
+                  selectedAuditIds.has(audit.id)
+                    ? "border-violet-500/50 bg-zinc-900"
+                    : "border-zinc-800 bg-zinc-900"
+                }`}
               >
 
                 <div className="flex items-start justify-between gap-4">
 
-                  <Link
-                    href={`/audit/${audit.id}`}
-                    className="flex-1"
-                  >
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
 
-                    <p className="text-zinc-400 text-sm">
-                      Website
-                    </p>
+                    <input
+                      type="checkbox"
+                      checked={selectedAuditIds.has(audit.id)}
+                      onChange={() =>
+                        toggleAuditSelected(audit.id)
+                      }
+                      aria-label={`Select audit for ${audit.url}`}
+                      className="h-4 w-4 mt-1 rounded border-zinc-700 bg-black accent-violet-500 shrink-0"
+                    />
 
-                    <h2 className="text-xl font-semibold mt-2 break-all">
-                      {audit.url}
-                    </h2>
+                    <Link
+                      href={`/audit/${audit.id}`}
+                      className="flex-1 min-w-0"
+                    >
 
-                  </Link>
+                      <p className="text-zinc-400 text-sm">
+                        Website
+                      </p>
+
+                      <h2 className="text-xl font-semibold mt-2 break-all">
+                        {audit.url}
+                      </h2>
+
+                    </Link>
+
+                  </div>
 
                   <button
                     onClick={() =>
@@ -635,7 +795,7 @@ export default function DashboardClient() {
                     }
                     aria-label={`Delete audit for ${audit.url}`}
                     title="Delete audit"
-                    className="text-red-400 hover:text-red-300 text-xl"
+                    className="text-zinc-500 hover:text-red-400 transition text-xl shrink-0"
                   >
                     ✕
                   </button>
@@ -789,6 +949,8 @@ export default function DashboardClient() {
             ))}
 
           </div>
+
+          </>
 
         )}
 

@@ -3,6 +3,8 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
 
 export default function LoginForm() {
 
@@ -13,6 +15,7 @@ export default function LoginForm() {
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [notice, setNotice] = useState("")
 
   const signUp = async () => {
 
@@ -20,6 +23,7 @@ export default function LoginForm() {
 
       setLoading(true)
       setError("")
+      setNotice("")
 
       const { error } =
         await supabase.auth.signUp({
@@ -32,7 +36,9 @@ export default function LoginForm() {
         return
       }
 
-      alert("Account created successfully")
+      setNotice(
+        "Account created — check your email to confirm, then log in."
+      )
 
     } catch {
 
@@ -52,6 +58,7 @@ export default function LoginForm() {
 
       setLoading(true)
       setError("")
+      setNotice("")
 
       const { error } =
         await supabase.auth.signInWithPassword({
@@ -64,7 +71,7 @@ export default function LoginForm() {
         return
       }
 
-      router.push("/")
+      router.push("/dashboard")
 
     } catch {
 
@@ -82,14 +89,14 @@ export default function LoginForm() {
 
     <main className="min-h-screen bg-black text-white flex items-center justify-center">
 
-      <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900 p-8">
+      <Card className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900 p-8">
 
         <h1 className="text-4xl font-bold">
           Login
         </h1>
 
         <p className="text-zinc-400 mt-2">
-          Access your SEO dashboard.
+          Access your marketing dashboard.
         </p>
 
         <div className="mt-8 space-y-4">
@@ -101,7 +108,7 @@ export default function LoginForm() {
             onChange={(e) =>
               setEmail(e.target.value)
             }
-            className="w-full rounded-xl bg-black border border-zinc-800 px-4 py-3"
+            className="w-full rounded-xl bg-black border border-zinc-800 px-4 py-3 outline-none focus:border-violet-500"
           />
 
           <input
@@ -111,7 +118,7 @@ export default function LoginForm() {
             onChange={(e) =>
               setPassword(e.target.value)
             }
-            className="w-full rounded-xl bg-black border border-zinc-800 px-4 py-3"
+            className="w-full rounded-xl bg-black border border-zinc-800 px-4 py-3 outline-none focus:border-violet-500"
           />
 
         </div>
@@ -126,27 +133,40 @@ export default function LoginForm() {
 
         )}
 
+        {notice && (
+
+          <div className="mt-4 rounded-xl border border-violet-500/20 bg-violet-500/10 p-3 text-violet-200">
+
+            {notice}
+
+          </div>
+
+        )}
+
         <div className="mt-6 flex gap-4">
 
-          <button
+          <Button
             onClick={signIn}
             disabled={loading}
-            className="flex-1 rounded-xl bg-white text-black py-3 font-semibold"
+            size="lg"
+            className="flex-1 py-3 h-auto"
           >
             Login
-          </button>
+          </Button>
 
-          <button
+          <Button
             onClick={signUp}
             disabled={loading}
-            className="flex-1 rounded-xl border border-zinc-700 py-3"
+            variant="outline"
+            size="lg"
+            className="flex-1 py-3 h-auto"
           >
             Sign Up
-          </button>
+          </Button>
 
         </div>
 
-      </div>
+      </Card>
 
     </main>
 

@@ -5,6 +5,12 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
+
+const navLinks = [
+  { href: "/", label: "New Audit" },
+  { href: "/dashboard", label: "Dashboard" }
+]
 
 export default function Navbar() {
 
@@ -31,7 +37,7 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
 
         <Link
-          href="/"
+          href="/dashboard"
           className="text-xl font-bold bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent"
         >
           AI Marketing OS
@@ -39,23 +45,27 @@ export default function Navbar() {
 
         <nav className="flex items-center gap-6">
 
-          <Link
-            href="/"
-            className="text-zinc-300 hover:text-white transition text-sm"
-          >
-            Audit Website
-          </Link>
+          {navLinks.map((link) => (
 
-          <Link
-            href="/dashboard"
-            className="text-zinc-300 hover:text-white transition text-sm"
-          >
-            Dashboard
-          </Link>
+            <Link
+              key={link.href}
+              href={link.href}
+              className={cn(
+                "text-sm transition",
+                pathname === link.href
+                  ? "text-white font-semibold"
+                  : "text-zinc-400 hover:text-white"
+              )}
+            >
+              {link.label}
+            </Link>
+
+          ))}
 
           <Button
             onClick={handleLogout}
             size="sm"
+            variant="outline"
           >
             Logout
           </Button>

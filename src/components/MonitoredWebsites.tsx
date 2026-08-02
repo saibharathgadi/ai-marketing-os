@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { formatLocalTimestamp } from "@/lib/date"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
 
 type Website = {
   id: string
@@ -341,7 +343,7 @@ export default function MonitoredWebsites({
 
   return (
 
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 mt-10">
+    <Card className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 mt-10">
 
       <div className="flex items-center justify-between gap-4 flex-wrap">
 
@@ -357,19 +359,20 @@ export default function MonitoredWebsites({
 
         </div>
 
-        <button
+        <Button
           onClick={
             handleRunScheduledAudits
           }
           disabled={loading}
-          className="rounded-xl bg-blue-600 px-6 py-3 font-semibold disabled:opacity-50"
+          size="lg"
+          className="h-auto py-3 px-6"
         >
 
           {loading
-            ? "Running..."
+            ? "Running…"
             : "Run Scheduled Audits"}
 
-        </button>
+        </Button>
 
       </div>
 
@@ -382,7 +385,7 @@ export default function MonitoredWebsites({
           onChange={(e) =>
             setUrl(e.target.value)
           }
-          className="flex-1 rounded-xl bg-black border border-zinc-700 px-5 py-4 outline-none"
+          className="flex-1 rounded-xl bg-black border border-zinc-700 px-5 py-4 outline-none focus:border-violet-500"
         />
 
         <input
@@ -394,20 +397,22 @@ export default function MonitoredWebsites({
               e.target.value
             )
           }
-          className="flex-1 rounded-xl bg-black border border-zinc-700 px-5 py-4 outline-none"
+          className="flex-1 rounded-xl bg-black border border-zinc-700 px-5 py-4 outline-none focus:border-violet-500"
         />
 
-        <button
+        <Button
           onClick={handleAddWebsite}
           disabled={loading}
-          className="rounded-xl bg-white text-black px-6 py-4 font-semibold disabled:opacity-50"
+          variant="outline"
+          size="lg"
+          className="h-auto py-4 px-6"
         >
 
           {loading
-            ? "Saving..."
+            ? "Saving…"
             : "Save Website"}
 
-        </button>
+        </Button>
 
       </div>
 
@@ -502,7 +507,7 @@ export default function MonitoredWebsites({
 
               <div className="flex gap-3">
 
-                <button
+                <Button
                   onClick={() =>
                     handleRunAudit(
                       website.id,
@@ -513,26 +518,28 @@ export default function MonitoredWebsites({
                     runningAudit ===
                     website.url
                   }
-                  className="rounded-xl bg-green-600 px-5 py-3 font-semibold disabled:opacity-50"
+                  variant="outline"
+                  className="h-auto py-3 px-5"
                 >
 
                   {runningAudit ===
                   website.url
-                    ? "Auditing..."
+                    ? "Auditing…"
                     : "Run Audit"}
 
-                </button>
+                </Button>
 
-                <button
+                <Button
                   onClick={() =>
                     handleDelete(
                       website.id
                     )
                   }
-                  className="rounded-xl bg-red-600 px-5 py-3 font-semibold"
+                  variant="destructive"
+                  className="h-auto py-3 px-5"
                 >
                   Delete
-                </button>
+                </Button>
 
               </div>
 
@@ -544,7 +551,7 @@ export default function MonitoredWebsites({
 
       </div>
 
-    </div>
+    </Card>
 
   )
 
