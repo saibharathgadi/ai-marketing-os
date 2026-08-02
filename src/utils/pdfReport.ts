@@ -32,6 +32,15 @@ type AiInsightsReportData = {
     funnelStage: string
     serpTarget: string
   }[]
+  contentIdeas?: {
+    title: string
+    description: string
+    type: string
+  }[]
+  socialIdeas?: {
+    platform: string
+    idea: string
+  }[]
   blogSeries?: {
     seriesTitle: string
     posts: { title: string }[]
@@ -39,11 +48,22 @@ type AiInsightsReportData = {
   socialSeries?: {
     platform: string
     seriesTitle: string
+    posts: { hook: string; caption: string }[]
   }[]
   adCampaigns?: {
     name: string
     objective: string
     channels: string[]
+  }[]
+  adSets?: {
+    campaignName: string
+    audienceAngle: string
+    creativeAngle: string
+    suggestedBudgetSplit: string
+  }[]
+  landingPageIdeas?: {
+    title: string
+    targetOffer: string
   }[]
   roadmap90Day?: {
     zeroToTwoWeeks: string[]
@@ -588,12 +608,14 @@ function drawFourMetricScorecard(
   }
 }
 
+type BulletItem = string | { text: string; indent?: boolean }
+
 function drawBulletList(
   pdfDoc: PDFDocument,
   fonts: ReportFonts,
   cursor: Cursor,
   heading: string,
-  items: string[]
+  items: BulletItem[]
 ) {
   let nextCursor =
     ensureSpace(pdfDoc, fonts, cursor, 50)
@@ -626,27 +648,36 @@ function drawBulletList(
     }
   }
 
-  for (const item of items) {
+  for (const rawItem of items) {
+    const item =
+      typeof rawItem === "string"
+        ? { text: rawItem, indent: false }
+        : rawItem
+
     nextCursor = ensureSpace(pdfDoc, fonts, nextCursor, 30)
 
-    nextCursor.page.drawText("-", {
-      x: margin + 10,
-      y: nextCursor.y,
-      size: 9,
-      font: fonts.bold,
-      color: theme.muted
-    })
+    if (!item.indent) {
+      nextCursor.page.drawText("-", {
+        x: margin + 10,
+        y: nextCursor.y,
+        size: 9,
+        font: fonts.bold,
+        color: theme.muted
+      })
+    }
+
+    const textX = item.indent ? margin + 34 : margin + 22
 
     const consumed = drawText(
       nextCursor.page,
-      item,
-      margin + 22,
+      item.text,
+      textX,
       nextCursor.y,
       {
         font: fonts.regular,
         size: 9,
         color: theme.text,
-        maxWidth: contentWidth - 34,
+        maxWidth: contentWidth - (textX - margin + 12),
         lineHeight: 12
       }
     )
@@ -1600,8 +1631,11 @@ export async function generatePDFReport(
     cursor,
     "Blog series",
     (aiInsights?.blogSeries || []).flatMap((series) => [
-      series.seriesTitle,
-      ...series.posts.map((post) => `  - ${post.title}`)
+      { text: series.seriesTitle },
+      ...series.posts.map((post) => ({
+        text: post.title,
+        indent: true
+      }))
     ])
   )
 
@@ -1610,9 +1644,13 @@ export async function generatePDFReport(
     fonts,
     cursor,
     "Social series",
-    (aiInsights?.socialSeries || []).map(
-      (series) => `[${series.platform}] ${series.seriesTitle}`
-    )
+    (aiInsights?.socialSeries || []).flatMap((series) => [
+      { text: `[${series.platform}] ${series.seriesTitle}` },
+      ...series.posts.map((post) => ({
+        text: post.hook,
+        indent: true
+      }))
+    ])
   )
 
   cursor = drawSectionTitle(
@@ -1638,6 +1676,99 @@ export async function generatePDFReport(
       safeText(campaign.channels?.join(", "))
     ]),
     "No ad campaign ideas were generated for this audit."
+  )
+
+  cursor = drawSectionTitle(
+    pdfDoc,
+    fonts,
+    cursor,
+    "Ad Sets",
+    "Suggested audience and creative angles for each ad campaign."
+  )
+
+  cursor = drawDataTable(
+    pdfDoc,
+    fonts,
+    cursor,
+    [
+      { header: "CAMPAIGN", width: contentWidth * 0.22 },
+      { header: "AUDIENCE ANGLE", width: contentWidth * 0.28 },
+      { header: "CREATIVE ANGLE", width: contentWidth * 0.28 },
+      { header: "BUDGET SPLIT", width: contentWidth * 0.22 }
+    ],
+    (aiInsights?.adSets || []).map((adSet) => [
+      safeText(adSet.campaignName),
+      safeText(adSet.audienceAngle),
+      safeText(adSet.creativeAngle),
+      safeText(adSet.suggestedBudgetSplit)
+    ]),
+    "No ad sets were generated for this audit."
+  )
+
+  cursor = drawSectionTitle(
+    pdfDoc,
+    fonts,
+    cursor,
+    "Content Ideas",
+    "Standalone blog and landing-page ideas generated from this audit's findings."
+  )
+
+  cursor = drawDataTable(
+    pdfDoc,
+    fonts,
+    cursor,
+    [
+      { header: "TITLE", width: contentWidth * 0.3 },
+      { header: "DESCRIPTION", width: contentWidth * 0.5 },
+      { header: "TYPE", width: contentWidth * 0.2 }
+    ],
+    (aiInsights?.contentIdeas || []).map((idea) => [
+      safeText(idea.title),
+      safeText(idea.description),
+      safeText(idea.type)
+    ]),
+    "No content ideas were generated for this audit."
+  )
+
+  cursor = drawSectionTitle(
+    pdfDoc,
+    fonts,
+    cursor,
+    "Social Ideas",
+    "Standalone social post ideas generated from this audit's findings."
+  )
+
+  cursor = drawDataTable(
+    pdfDoc,
+    fonts,
+    cursor,
+    [
+      { header: "PLATFORM", width: contentWidth * 0.2 },
+      { header: "IDEA", width: contentWidth * 0.8 }
+    ],
+    (aiInsights?.socialIdeas || []).map((idea) => [
+      safeText(idea.platform),
+      safeText(idea.idea)
+    ]),
+    "No social ideas were generated for this audit."
+  )
+
+  cursor = drawSectionTitle(
+    pdfDoc,
+    fonts,
+    cursor,
+    "Landing Page Ideas",
+    "Suggested landing pages generated from this audit's findings."
+  )
+
+  cursor = drawBulletList(
+    pdfDoc,
+    fonts,
+    cursor,
+    "Landing pages",
+    (aiInsights?.landingPageIdeas || []).map((page) => ({
+      text: `${page.title} — ${page.targetOffer}`
+    }))
   )
 
   cursor = drawSectionTitle(
