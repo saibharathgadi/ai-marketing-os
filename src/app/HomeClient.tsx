@@ -239,7 +239,7 @@ export default function HomeClient() {
 
         {requiresLogin && (
 
-          <div className="mt-6 rounded-2xl border border-violet-500/20 bg-violet-500/10 p-6 text-violet-200">
+          <div className="mt-6 rounded-2xl border border-violet-500/20 bg-violet-500/10 p-6 text-violet-700 dark:text-violet-300">
             Please{" "}
             <Link href="/login" className="underline font-semibold">
               log in
@@ -251,7 +251,7 @@ export default function HomeClient() {
 
         {error && (
 
-          <div className="mt-6 rounded-2xl border border-red-500/20 bg-red-500/10 p-6 text-red-300">
+          <div className="mt-6 rounded-2xl border border-red-500/20 bg-red-500/10 p-6 text-red-700 dark:text-red-300">
             {error}
           </div>
 
