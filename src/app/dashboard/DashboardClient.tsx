@@ -617,7 +617,7 @@ export default function DashboardClient() {
 
               <Link
                 href={`/audit/${latestIdeas.auditId}`}
-                className="text-sm text-violet-400 hover:text-violet-300"
+                className="text-sm text-violet-400 hover:text-violet-700 dark:text-violet-300"
               >
                 View full breakdown →
               </Link>

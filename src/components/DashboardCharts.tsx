@@ -170,33 +170,33 @@ function getStatusClasses(
   status: RegressionHealthStatus
 ) {
   if (status === "Improving") {
-    return "border-green-500/20 bg-green-500/10 text-green-300"
+    return "border-green-500/20 bg-green-500/10 text-green-700 dark:text-green-300"
   }
 
   if (status === "Warning") {
-    return "border-orange-500/20 bg-orange-500/10 text-orange-300"
+    return "border-orange-500/20 bg-orange-500/10 text-orange-700 dark:text-orange-300"
   }
 
   if (status === "Critical") {
-    return "border-red-500/20 bg-red-500/10 text-red-300"
+    return "border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-300"
   }
 
-  return "border-blue-500/20 bg-blue-500/10 text-blue-300"
+  return "border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-300"
 }
 
 function getAlertClasses(
   alert: RegressionAlert
 ) {
   if (alert.severity === "critical") {
-    return "border-red-500/20 bg-red-500/10 text-red-200"
+    return "border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-300"
   }
 
   if (alert.severity === "warning") {
-    return "border-orange-500/20 bg-orange-500/10 text-orange-200"
+    return "border-orange-500/20 bg-orange-500/10 text-orange-700 dark:text-orange-300"
   }
 
   if (alert.severity === "positive") {
-    return "border-green-500/20 bg-green-500/10 text-green-200"
+    return "border-green-500/20 bg-green-500/10 text-green-700 dark:text-green-300"
   }
 
   return "border-border bg-muted text-muted-foreground"

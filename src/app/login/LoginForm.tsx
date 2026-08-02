@@ -130,7 +130,7 @@ export default function LoginForm() {
 
         {error && (
 
-          <div className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-red-300">
+          <div className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-red-700 dark:text-red-300">
 
             {error}
 
@@ -140,7 +140,7 @@ export default function LoginForm() {
 
         {notice && (
 
-          <div className="mt-4 rounded-xl border border-violet-500/20 bg-violet-500/10 p-3 text-violet-200">
+          <div className="mt-4 rounded-xl border border-violet-500/20 bg-violet-500/10 p-3 text-violet-700 dark:text-violet-300">
 
             {notice}
 

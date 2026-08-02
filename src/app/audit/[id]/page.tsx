@@ -80,33 +80,33 @@ function getStatusClasses(
   status: RegressionHealthStatus
 ) {
   if (status === "Improving") {
-    return "border-green-500/20 bg-green-500/10 text-green-300"
+    return "border-green-500/20 bg-green-500/10 text-green-700 dark:text-green-300"
   }
 
   if (status === "Warning") {
-    return "border-orange-500/20 bg-orange-500/10 text-orange-300"
+    return "border-orange-500/20 bg-orange-500/10 text-orange-700 dark:text-orange-300"
   }
 
   if (status === "Critical") {
-    return "border-red-500/20 bg-red-500/10 text-red-300"
+    return "border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-300"
   }
 
-  return "border-blue-500/20 bg-blue-500/10 text-blue-300"
+  return "border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-300"
 }
 
 function getAlertClasses(
   alert: RegressionAlert
 ) {
   if (alert.severity === "critical") {
-    return "border-red-500/20 bg-red-500/10 text-red-200"
+    return "border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-300"
   }
 
   if (alert.severity === "warning") {
-    return "border-orange-500/20 bg-orange-500/10 text-orange-200"
+    return "border-orange-500/20 bg-orange-500/10 text-orange-700 dark:text-orange-300"
   }
 
   if (alert.severity === "positive") {
-    return "border-green-500/20 bg-green-500/10 text-green-200"
+    return "border-green-500/20 bg-green-500/10 text-green-700 dark:text-green-300"
   }
 
   return "border-border bg-background text-foreground"
@@ -584,7 +584,7 @@ export default async function AuditDetailPage({
 
                       {page.issues?.length === 0 ? (
 
-                        <div className="rounded-xl bg-green-500/10 border border-green-500/20 p-3 text-green-300">
+                        <div className="rounded-xl bg-green-500/10 border border-green-500/20 p-3 text-green-700 dark:text-green-300">
                           No SEO issues detected
                         </div>
 
@@ -598,7 +598,7 @@ export default async function AuditDetailPage({
 
                             <div
                               key={index}
-                              className="rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-red-300"
+                              className="rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-red-700 dark:text-red-300"
                             >
                               {issue}
                             </div>
@@ -618,7 +618,7 @@ export default async function AuditDetailPage({
                       AI Recommendations
                     </p>
 
-                    <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 p-4 whitespace-pre-wrap text-blue-100">
+                    <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 p-4 whitespace-pre-wrap text-blue-700 dark:text-blue-300">
                       {page.ai_recommendations}
                     </div>
 

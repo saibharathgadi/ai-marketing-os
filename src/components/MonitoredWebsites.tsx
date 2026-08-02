@@ -477,7 +477,7 @@ export default function MonitoredWebsites({
 
                   {website.last_audit_is_slow && (
 
-                    <span className="rounded-lg bg-orange-500/10 px-3 py-2 text-orange-300">
+                    <span className="rounded-lg bg-orange-500/10 px-3 py-2 text-orange-700 dark:text-orange-300">
                       Slow website
                     </span>
 
@@ -485,7 +485,7 @@ export default function MonitoredWebsites({
 
                   {website.last_failure_reason && (
 
-                    <span className="rounded-lg bg-red-500/10 px-3 py-2 text-red-300">
+                    <span className="rounded-lg bg-red-500/10 px-3 py-2 text-red-700 dark:text-red-300">
                       Last failure:{" "}
                       {website.last_failure_reason}
                     </span>
@@ -494,7 +494,7 @@ export default function MonitoredWebsites({
 
                   {website.notification_email && (
 
-                    <span className="rounded-lg bg-blue-500/10 px-3 py-2 text-blue-300">
+                    <span className="rounded-lg bg-blue-500/10 px-3 py-2 text-blue-700 dark:text-blue-300">
                       Alerts:{" "}
                       {website.notification_email}
                     </span>

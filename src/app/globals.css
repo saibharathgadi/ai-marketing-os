@@ -1,6 +1,16 @@
 @import "tailwindcss";
 
 /*
+ * The shadcn-style UI kit ships with dark: refinement classes (tabs,
+ * badge, button, input, textarea) that were dormant until now — the
+ * default `dark:` variant keys off prefers-color-scheme, but our toggle
+ * sets a data-theme attribute instead. This makes `dark:` key off that
+ * attribute so those existing classes actually activate under our theme
+ * system, and so it's available for the same pattern elsewhere.
+ */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/*
  * Dual dark/light theme, both built around the same violet/indigo brand
  * accent, wired to the shadcn-style component primitives in
  * src/components/ui/ (Button/Card/Badge/Tabs/etc.) so bg-primary,
