@@ -7,6 +7,7 @@ import {
   TabsTrigger
 } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
+import SaveToContentStudioButton from "@/components/SaveToContentStudioButton"
 
 export type AIInsights = {
   executiveSummary: string
@@ -113,9 +114,13 @@ function EmptyState({ label }: { label: string }) {
 }
 
 export default function AuditCopilotTabs({
-  aiInsights
+  aiInsights,
+  auditId,
+  siteUrl
 }: {
   aiInsights: AIInsights
+  auditId: string
+  siteUrl: string
 }) {
   const contentIdeas = aiInsights.contentIdeas || []
   const blogIdeas = contentIdeas.filter((idea) => idea.type === "blog")
@@ -262,6 +267,21 @@ export default function AuditCopilotTabs({
                     <p className="text-xs text-zinc-500 mt-1">
                       {idea.description}
                     </p>
+                    <div className="mt-3">
+                      <SaveToContentStudioButton
+                        auditId={auditId}
+                        siteUrl={siteUrl}
+                        type={
+                          idea.type === "blog"
+                            ? "blog_idea"
+                            : idea.type === "landing-page"
+                              ? "landing_page_idea"
+                              : "social_idea"
+                        }
+                        title={idea.title}
+                        body={{ description: idea.description }}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -294,6 +314,18 @@ export default function AuditCopilotTabs({
                         </li>
                       ))}
                     </ol>
+                    <div className="mt-3">
+                      <SaveToContentStudioButton
+                        auditId={auditId}
+                        siteUrl={siteUrl}
+                        type="blog_series"
+                        title={series.seriesTitle}
+                        body={{
+                          description: series.description,
+                          posts: series.posts
+                        }}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -314,6 +346,15 @@ export default function AuditCopilotTabs({
                   >
                     <Badge variant="secondary">{idea.platform}</Badge>
                     <p className="text-sm mt-2">{idea.idea}</p>
+                    <div className="mt-3">
+                      <SaveToContentStudioButton
+                        auditId={auditId}
+                        siteUrl={siteUrl}
+                        type="social_idea"
+                        title={idea.idea.slice(0, 60)}
+                        body={{ platform: idea.platform, idea: idea.idea }}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -348,6 +389,18 @@ export default function AuditCopilotTabs({
                         </li>
                       ))}
                     </ul>
+                    <div className="mt-3">
+                      <SaveToContentStudioButton
+                        auditId={auditId}
+                        siteUrl={siteUrl}
+                        type="social_series"
+                        title={series.seriesTitle}
+                        body={{
+                          platform: series.platform,
+                          posts: series.posts
+                        }}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -387,6 +440,20 @@ export default function AuditCopilotTabs({
                         </Badge>
                       ))}
                     </div>
+                    <div className="mt-3">
+                      <SaveToContentStudioButton
+                        auditId={auditId}
+                        siteUrl={siteUrl}
+                        type="ad_campaign"
+                        title={campaign.name}
+                        body={{
+                          objective: campaign.objective,
+                          targetAudience: campaign.targetAudience,
+                          keyMessage: campaign.keyMessage,
+                          channels: campaign.channels
+                        }}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -418,6 +485,19 @@ export default function AuditCopilotTabs({
                       <span className="text-zinc-500">Budget split: </span>
                       {adSet.suggestedBudgetSplit}
                     </p>
+                    <div className="mt-3">
+                      <SaveToContentStudioButton
+                        auditId={auditId}
+                        siteUrl={siteUrl}
+                        type="ad_set"
+                        title={adSet.campaignName}
+                        body={{
+                          audienceAngle: adSet.audienceAngle,
+                          creativeAngle: adSet.creativeAngle,
+                          suggestedBudgetSplit: adSet.suggestedBudgetSplit
+                        }}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -458,6 +538,18 @@ export default function AuditCopilotTabs({
                         </div>
                       ))}
                     </div>
+                    <div className="mt-3">
+                      <SaveToContentStudioButton
+                        auditId={auditId}
+                        siteUrl={siteUrl}
+                        type="landing_page_idea"
+                        title={page.title}
+                        body={{
+                          targetOffer: page.targetOffer,
+                          sections: page.sections
+                        }}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -497,6 +589,19 @@ export default function AuditCopilotTabs({
                       <span className="text-zinc-400">SERP target: </span>
                       {cluster.serpTarget}
                     </p>
+                    <div className="mt-3">
+                      <SaveToContentStudioButton
+                        auditId={auditId}
+                        siteUrl={siteUrl}
+                        type="keyword_cluster"
+                        title={cluster.cluster}
+                        body={{
+                          exampleKeywords: cluster.exampleKeywords,
+                          funnelStage: cluster.funnelStage,
+                          serpTarget: cluster.serpTarget
+                        }}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
