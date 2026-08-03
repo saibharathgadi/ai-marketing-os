@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import {
   Tabs,
   TabsContent,
@@ -8,6 +9,8 @@ import {
 } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import SaveToContentStudioButton from "@/components/SaveToContentStudioButton"
+import SaveCampaignButton from "@/components/SaveCampaignButton"
+import SaveAdSetButton from "@/components/SaveAdSetButton"
 
 export type AIInsights = {
   executiveSummary: string
@@ -127,6 +130,21 @@ export default function AuditCopilotTabs({
   const landingIdeasFromContent = contentIdeas.filter(
     (idea) => idea.type === "landing-page"
   )
+
+  // Campaign name -> saved Campaign Builder id. Ad sets require a real
+  // campaign_id foreign key, so an ad set's Save button only unlocks once
+  // its matching campaign has been saved in this session — see
+  // SaveAdSetButton, which renders a hint instead of a button when absent.
+  const [savedCampaignIds, setSavedCampaignIds] =
+    useState<Map<string, string>>(new Map())
+
+  function handleCampaignSaved(name: string, id: string) {
+    setSavedCampaignIds((prev) => {
+      const next = new Map(prev)
+      next.set(name, id)
+      return next
+    })
+  }
 
   return (
     <section className="mt-10 rounded-2xl border border-border bg-card p-6">
@@ -440,7 +458,7 @@ export default function AuditCopilotTabs({
                         </Badge>
                       ))}
                     </div>
-                    <div className="mt-3">
+                    <div className="mt-3 flex flex-wrap gap-2">
                       <SaveToContentStudioButton
                         auditId={auditId}
                         siteUrl={siteUrl}
@@ -452,6 +470,18 @@ export default function AuditCopilotTabs({
                           keyMessage: campaign.keyMessage,
                           channels: campaign.channels
                         }}
+                      />
+                      <SaveCampaignButton
+                        auditId={auditId}
+                        siteUrl={siteUrl}
+                        name={campaign.name}
+                        objective={campaign.objective}
+                        targetAudience={campaign.targetAudience}
+                        keyMessage={campaign.keyMessage}
+                        channels={campaign.channels || []}
+                        onSaved={(id) =>
+                          handleCampaignSaved(campaign.name, id)
+                        }
                       />
                     </div>
                   </div>
@@ -485,7 +515,7 @@ export default function AuditCopilotTabs({
                       <span className="text-muted-foreground">Budget split: </span>
                       {adSet.suggestedBudgetSplit}
                     </p>
-                    <div className="mt-3">
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
                       <SaveToContentStudioButton
                         auditId={auditId}
                         siteUrl={siteUrl}
@@ -496,6 +526,15 @@ export default function AuditCopilotTabs({
                           creativeAngle: adSet.creativeAngle,
                           suggestedBudgetSplit: adSet.suggestedBudgetSplit
                         }}
+                      />
+                      <SaveAdSetButton
+                        campaignId={
+                          savedCampaignIds.get(adSet.campaignName) ?? null
+                        }
+                        campaignName={adSet.campaignName}
+                        audienceAngle={adSet.audienceAngle}
+                        creativeAngle={adSet.creativeAngle}
+                        suggestedBudgetSplit={adSet.suggestedBudgetSplit}
                       />
                     </div>
                   </div>
