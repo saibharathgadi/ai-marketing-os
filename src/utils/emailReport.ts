@@ -43,7 +43,7 @@ type SendSeoReportEmailResult = {
 
 const resendApiUrl = "https://api.resend.com/emails"
 const defaultFromEmail =
-  "AI Marketing OS <onboarding@resend.dev>"
+  "Quorai <onboarding@resend.dev>"
 
 function getFromEmail() {
   return (
@@ -185,7 +185,7 @@ function buildReportHtml(
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:680px;background:#111217;border:1px solid #2f333d;border-radius:12px;overflow:hidden;">
             <tr>
               <td style="padding:32px 32px 18px 32px;border-bottom:1px solid #2f333d;">
-                <div style="font-size:13px;font-weight:700;color:#60a5fa;letter-spacing:0.04em;text-transform:uppercase;">AI Marketing OS</div>
+                <div style="font-size:13px;font-weight:700;color:#60a5fa;letter-spacing:0.04em;text-transform:uppercase;">Quorai</div>
                 <h1 style="margin:12px 0 10px 0;color:#ffffff;font-size:28px;line-height:1.2;">SEO Audit Report</h1>
                 <p style="margin:0;color:#a1a1aa;font-size:14px;line-height:1.6;">${escapeHtml(
                   audit.url
@@ -233,7 +233,7 @@ function buildReportText(
   recommendations: string[]
 ) {
   return [
-    "AI Marketing OS - SEO Audit Report",
+    "Quorai - SEO Audit Report",
     "",
     `Website: ${audit.url}`,
     `SEO Score: ${audit.average_score}/100`,
@@ -273,7 +273,7 @@ function buildRegressionAlertHtml(
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:680px;background:#111217;border:1px solid #2f333d;border-radius:12px;overflow:hidden;">
             <tr>
               <td style="padding:32px;border-bottom:1px solid #2f333d;">
-                <div style="font-size:13px;font-weight:700;color:#60a5fa;letter-spacing:0.04em;text-transform:uppercase;">AI Marketing OS</div>
+                <div style="font-size:13px;font-weight:700;color:#60a5fa;letter-spacing:0.04em;text-transform:uppercase;">Quorai</div>
                 <h1 style="margin:12px 0 10px 0;color:#ffffff;font-size:28px;line-height:1.2;">SEO Regression Alert</h1>
                 <p style="margin:0;color:#a1a1aa;font-size:14px;line-height:1.6;">${escapeHtml(
                   audit.url
@@ -322,7 +322,7 @@ function buildRegressionAlertText(
   regression: RegressionAnalysis
 ) {
   return [
-    "AI Marketing OS - SEO Regression Alert",
+    "Quorai - SEO Regression Alert",
     "",
     `Website: ${audit.url}`,
     `Health: ${regression.status}`,

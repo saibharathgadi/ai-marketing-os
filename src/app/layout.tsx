@@ -5,9 +5,9 @@ import { ThemeProvider } from "@/components/ThemeProvider"
 import { InlineScript } from "@/components/InlineScript"
 
 export const metadata: Metadata = {
-  title: "AI Marketing OS",
+  title: "Quorai",
   description:
-    "AI-powered SEO auditing platform"
+    "The AI platform for SEO, AEO, GEO, content, and campaigns."
 }
 
 // Runs before hydration so the correct theme is applied on first paint —

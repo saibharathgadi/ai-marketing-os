@@ -2,10 +2,10 @@ import type { Metadata } from "next"
 import HomeClient from "./HomeClient"
 
 const title =
-  "AI Marketing OS | Automated SEO, AEO & GEO Audit Platform"
+  "Quorai | AI Platform for SEO, AEO, GEO, Content & Campaigns"
 
 const description =
-  "Run comprehensive 360-degree digital marketing, SEO, AEO, and GEO audits instantly with AI Marketing OS."
+  "Run comprehensive 360-degree digital marketing, SEO, AEO, and GEO audits instantly with Quorai."
 
 export const metadata: Metadata = {
   title,
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
 const softwareApplicationStructuredData = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  name: "AI Marketing OS",
+  name: "Quorai",
   description,
   applicationCategory: "BusinessApplication",
   operatingSystem: "Any",
