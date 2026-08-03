@@ -1,4 +1,4 @@
-# Quorai
+# Verolyx
 
 An AI-powered SEO audit platform: crawl a website, score it against
 deterministic SEO rules, get AI-generated insights on top of that score,

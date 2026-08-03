@@ -3,10 +3,10 @@ import { Suspense } from "react"
 import HomeClient from "./HomeClient"
 
 const title =
-  "Quorai | AI Platform for SEO, AEO, GEO, Content & Campaigns"
+  "Verolyx | AI Platform for SEO, AEO, GEO, Content & Campaigns"
 
 const description =
-  "Run comprehensive 360-degree digital marketing, SEO, AEO, and GEO audits instantly with Quorai."
+  "Run comprehensive 360-degree digital marketing, SEO, AEO, and GEO audits instantly with Verolyx."
 
 export const metadata: Metadata = {
   title,
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
 const softwareApplicationStructuredData = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  name: "Quorai",
+  name: "Verolyx",
   description,
   applicationCategory: "BusinessApplication",
   operatingSystem: "Any",

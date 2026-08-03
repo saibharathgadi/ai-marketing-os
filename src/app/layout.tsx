@@ -5,7 +5,7 @@ import { ThemeProvider } from "@/components/ThemeProvider"
 import { InlineScript } from "@/components/InlineScript"
 
 export const metadata: Metadata = {
-  title: "Quorai",
+  title: "Verolyx",
   description:
     "The AI platform for SEO, AEO, GEO, content, and campaigns."
 }
