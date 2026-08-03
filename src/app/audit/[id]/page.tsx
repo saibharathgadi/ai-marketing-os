@@ -34,6 +34,7 @@ type TechnicalSeo = {
 type AuditRow = {
   id: string
   url: string
+  org_id: string | null
   average_score: number
   total_pages: number
   total_issues: number
@@ -163,12 +164,14 @@ export default async function AuditDetailPage({
   const supabase = await createClient()
 
   // RLS restricts every query below to audits/pages in organizations
-  // the current session's user belongs to.
+  // the current session's user belongs to — plus a separate policy
+  // (see the anon_teaser_audits migration) that lets anyone read back
+  // org-less teaser audits specifically.
   const auditQuery =
     supabase
       .from("audits")
       .select(
-        "id,url,average_score,total_pages,total_issues,created_at,technical_seo,ai_insights"
+        "id,url,org_id,average_score,total_pages,total_issues,created_at,technical_seo,ai_insights"
       )
       .eq("id", id)
       .single()
@@ -187,20 +190,69 @@ export default async function AuditDetailPage({
 
   const [
     { data: audit },
-    { data: pages }
+    { data: pages },
+    { data: { user } }
   ] =
     await Promise.all([
       auditQuery,
-      pagesQuery
+      pagesQuery,
+      supabase.auth.getUser()
     ])
 
   const currentAudit =
     audit as AuditRow | null
 
+  const isAnonymousViewer = !user
+  const isTeaserAudit =
+    currentAudit?.org_id === null
+
+  // An anonymous viewer hitting a private (org-owned) audit link, or a
+  // nonexistent one — RLS already returned null above for the private
+  // case, so this can't leak org data, it just needs friendlier UI than
+  // a blank page.
+  if (
+    isAnonymousViewer &&
+    !isTeaserAudit
+  ) {
+
+    return (
+
+      <main className="relative min-h-screen bg-background text-foreground flex items-center justify-center overflow-hidden">
+
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 -z-10 bg-[image:var(--gradient-glow)]"
+        />
+
+        <Card className="w-full max-w-md rounded-2xl border border-border bg-card p-8 text-center">
+
+          <h1 className="text-2xl font-bold">
+            Log in to view this audit
+          </h1>
+
+          <p className="text-muted-foreground mt-3">
+            This audit is private. Log in to the account it belongs to
+            in order to view it.
+          </p>
+
+          <Button asChild size="lg" className="mt-6 w-full h-auto py-3">
+            <Link href="/login">
+              Log in
+            </Link>
+          </Button>
+
+        </Card>
+
+      </main>
+
+    )
+
+  }
+
   let previousAudit: AuditRow | null = null
   let previousPages: CrawledPageRow[] = []
 
-  if (currentAudit) {
+  if (currentAudit && !isTeaserAudit) {
 
     const { data: previousAuditData } =
       await supabase
@@ -264,14 +316,14 @@ export default async function AuditDetailPage({
           <div>
 
             <Link
-              href="/dashboard"
+              href={isTeaserAudit ? "/" : "/dashboard"}
               className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition"
             >
-              ← Back to Dashboard
+              {isTeaserAudit ? "← Back to Home" : "← Back to Dashboard"}
             </Link>
 
             <h1 className="text-4xl font-bold mt-3">
-              Audit Details
+              {isTeaserAudit ? "Preview Audit" : "Audit Details"}
             </h1>
 
             <p className="text-muted-foreground mt-2 break-all">
@@ -280,11 +332,15 @@ export default async function AuditDetailPage({
 
           </div>
 
-          <Button asChild size="lg" className="h-auto py-3 px-6">
-            <Link href={`/api/report/${id}`}>
-              Download PDF
-            </Link>
-          </Button>
+          {!isTeaserAudit && (
+
+            <Button asChild size="lg" className="h-auto py-3 px-6">
+              <Link href={`/api/report/${id}`}>
+                Download PDF
+              </Link>
+            </Button>
+
+          )}
 
         </div>
 
@@ -354,6 +410,37 @@ export default async function AuditDetailPage({
           </div>
 
         </div>
+
+        {isTeaserAudit && (
+
+          <Card className="mt-10 rounded-2xl border border-violet-500/20 bg-violet-500/10 p-8 text-center">
+
+            <h2 className="text-2xl font-bold">
+              This is a preview
+            </h2>
+
+            <p className="text-muted-foreground mt-2 max-w-xl mx-auto">
+              You&apos;re seeing {currentAudit?.total_pages ?? "a"} crawled
+              page{currentAudit?.total_pages === 1 ? "" : "s"}. Log in or
+              sign up to run a full multi-page audit with AI-generated
+              content, campaign, and roadmap recommendations.
+            </p>
+
+            <Button asChild size="lg" className="mt-6 h-auto py-3 px-8">
+              <Link
+                href={`/login?next=${encodeURIComponent(
+                  `/?url=${encodeURIComponent(currentAudit?.url ?? "")}`
+                )}`}
+              >
+                Log in for full audit
+              </Link>
+            </Button>
+
+          </Card>
+
+        )}
+
+        {!isTeaserAudit && (
 
         <section className="mt-10 rounded-2xl border border-border bg-card p-6">
 
@@ -445,6 +532,8 @@ export default async function AuditDetailPage({
           </div>
 
         </section>
+
+        )}
 
         {currentAudit?.ai_insights && (
 

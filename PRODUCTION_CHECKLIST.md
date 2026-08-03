@@ -14,10 +14,13 @@ detailed writeup behind each unchecked item.
 - [x] No `dangerouslySetInnerHTML` / XSS vector anywhere (verified —
       React's default escaping covers all rendered crawl content)
 - [x] No secrets committed to the repo (`.env.local` is gitignored)
-- [ ] **Authentication enforcement** — login exists but nothing checks a
-      session; every route and page is fully public
-- [ ] **Row Level Security verified** — depends on your live Supabase
-      project's policies, not confirmable from the repo alone
+- [x] **Authentication enforcement** — `middleware.ts` checks a session
+      on every request and redirects/blocks unauthenticated access to
+      private routes and pages
+- [x] **Row Level Security verified** — enabled with org-scoped policies
+      on every core table (`organizations`, `organization_members`,
+      `monitored_websites`, `audits`, `crawled_pages`); a recursion bug
+      was found and fixed (see `TECH_DEBT.md`)
 - [ ] DNS-rebinding protection for the crawler (hostname-based SSRF
       blocking can't catch a domain that resolves to an internal IP;
       closing this needs DNS-pinning in the fetch layer)
@@ -30,13 +33,12 @@ detailed writeup behind each unchecked item.
       correctly (no orphaned rows on partial failure)
 - [x] Regression comparisons are scoped per-website, not mixed across
       different monitored sites
-- [ ] **Database migrations** — schema changes are tracked only in a
-      hand-run SQL file, not real migration history
+- [x] **Database migrations** — real, source-controlled migrations in
+      `supabase/migrations/`
 - [ ] **Queue/rate-limiter durability** — in-memory (`globalThis`) state
       doesn't coordinate across multiple serverless instances
-- [ ] Real scheduler wired up (no `vercel.json` cron / external scheduler
-      configured — "scheduled audits" currently only run on manual
-      trigger)
+- [x] Real scheduler wired up (`vercel.json` cron, daily, hitting
+      `/api/run-scheduled-audits`)
 
 ## Code Quality
 

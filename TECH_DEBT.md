@@ -5,37 +5,41 @@ down before this becomes a multi-tenant SaaS product. See
 `PRODUCTION_CHECKLIST.md` for the production-readiness gate items and
 `ROADMAP.md` for feature sequencing.
 
+## Resolved since last review
+
+- **Authentication enforcement** — `middleware.ts` now gates every
+  private route/page behind a session check via `supabase.auth.getUser()`.
+- **Organizations / ownership model** — `organizations`,
+  `organization_members` tables exist; `monitored_websites`, `audits`,
+  `crawled_pages` are all `org_id`-scoped.
+- **Row Level Security** — confirmed enabled (`alter table ... enable row
+  level security`) with real org-scoped policies on every core table in
+  `supabase/migrations/20260726151448_multi_tenant.sql`. A recursion bug
+  in the "view org teammates" policy was found and fixed via a
+  `SECURITY DEFINER` helper function
+  (`20260801172500_fix_org_members_rls_recursion.sql`).
+- **Database migrations** — `supabase/migrations/` now holds real,
+  source-controlled, timestamped migrations. The
+  `database-index-recommendations.sql` hand-run file is legacy at this
+  point.
+- **Scheduler** — `vercel.json` has a real cron
+  (`0 3 * * *` → `/api/run-scheduled-audits`) — scheduled audits now run
+  on a timer, not just on manual dashboard click.
+
 ## Critical (blocks multi-tenant SaaS)
 
-- **No authentication enforcement.** Login/signup/logout work
-  (`src/app/login/LoginForm.tsx`), but nothing checks a session anywhere —
-  no `middleware.ts`, no `supabase.auth.getUser()` call in any route or
-  page. Every audit, every monitored website, and every API route is fully
-  public. There is also no `user_id`/`org_id` on any table — the data model
-  itself has no concept of ownership yet.
-- **Row Level Security state is unverified.** The app uses only the anon
-  key (`src/lib/supabase.ts`), including from client components that query
-  Supabase directly. Whether this is safe depends entirely on your
-  Supabase project's RLS policies — verify this directly in Supabase; it
-  is not something the repo can confirm on its own.
+- **Teams & role-based permissions are schema-only.**
+  `organization_members.role` supports `owner`/`member`, but there's no
+  invite flow (no UI, no API route) and nothing in the app actually
+  branches on role — anyone in an org has identical access today.
 
 ## High
 
-- **No real scheduler wired up.** "Scheduled audits" only run when someone
-  clicks the dashboard button (`POST /api/monitored-websites/run-all`) or
-  when an external caller hits `GET /api/run-scheduled-audits` with the
-  cron secret. There is no `vercel.json` cron config or any other
-  automation actually calling it on a timer.
 - **In-memory queue/rate-limiter don't survive horizontal scaling.**
   `src/utils/auditQueue.ts` and `src/utils/rateLimit.ts` both use
   `globalThis` for state, which is per-process. Under real multi-instance
   serverless deployment, the same URL can be crawled concurrently by two
   instances, and rate limits reset per cold start / aren't shared.
-- **No database migrations.** Schema changes are tracked only in
-  `database-index-recommendations.sql`, a hand-run SQL file, not a real
-  migration history. This is the direct cause of the "missing column"
-  fallback logic scattered through the codebase — real migrations would
-  let that defensive code be deleted entirely.
 - **Zero automated tests.** No test runner configured, no test files. The
   deterministic scoring/regression logic (`analyzer.ts`, `seoRegression.ts`)
   is pure and easily testable but has no coverage at all.

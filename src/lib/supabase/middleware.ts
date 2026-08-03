@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
+import { isSafeRedirectPath } from "@/lib/utils"
 
 const publicPaths = ["/login", "/"]
 
@@ -13,7 +14,13 @@ function isPublicPath(pathname: string) {
     // The OAuth callback runs before a session cookie exists, so it must
     // stay reachable without one.
     pathname.startsWith("/auth/") ||
-    pathname === "/favicon.ico"
+    pathname === "/favicon.ico" ||
+    // Anonymous visitors get a capped teaser crawl instead of a 401 —
+    // the route itself branches on session presence.
+    pathname === "/api/analyze" ||
+    // Audit pages render a teaser (org-less) or a "please log in"
+    // notice for anonymous visitors instead of redirecting away.
+    pathname.startsWith("/audit/")
   )
 }
 
@@ -81,8 +88,13 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user && pathname === "/login") {
+    const next = request.nextUrl.searchParams.get("next")
+
     return NextResponse.redirect(
-      new URL("/dashboard", request.url)
+      new URL(
+        isSafeRedirectPath(next) ? next : "/dashboard",
+        request.url
+      )
     )
   }
 

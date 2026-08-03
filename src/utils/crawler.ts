@@ -52,7 +52,7 @@ type CrawledPage = ReturnType<typeof analyzePage> & {
 
 type AuditInsertPayload = {
   url: string
-  org_id: string
+  org_id: string | null
   average_score: number
   total_pages: number
   total_issues: number
@@ -678,7 +678,8 @@ async function persistCrawledPages(
 
 export async function crawlWebsite(
   url: string,
-  orgId: string
+  orgId: string | null,
+  options?: { maxPages?: number }
 ) {
 
   const startedAt = Date.now()
@@ -698,8 +699,12 @@ export async function crawlWebsite(
     }
   }
 
-  const crawlConfig =
-    getCrawlConfig()
+  const crawlConfig = {
+    ...getCrawlConfig(),
+    ...(options?.maxPages
+      ? { maxPages: options.maxPages }
+      : {})
+  }
 
   const homepageResult =
     await loadPage(urlValidation.url)

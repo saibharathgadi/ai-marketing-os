@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
+import type { User } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/ThemeToggle"
@@ -20,6 +21,30 @@ export default function Navbar() {
   const router = useRouter()
   const pathname = usePathname()
   const [supabase] = useState(createClient)
+
+  // Defaults to "logged out" — the common case for the first paint on
+  // the public landing page — and updates once the session check
+  // resolves, or immediately on login/logout via onAuthStateChange.
+  const [user, setUser] = useState<User | null>(null)
+
+  useEffect(() => {
+
+    supabase.auth
+      .getUser()
+      .then(({ data }) => setUser(data.user))
+
+    const { data: subscription } =
+      supabase.auth.onAuthStateChange(
+        (_event, session) => {
+          setUser(session?.user ?? null)
+        }
+      )
+
+    return () => {
+      subscription.subscription.unsubscribe()
+    }
+
+  }, [supabase])
 
   async function handleLogout() {
 
@@ -40,42 +65,66 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
 
         <Link
-          href="/dashboard"
+          href={user ? "/dashboard" : "/"}
           className="text-xl font-bold bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent"
         >
           Quorai
         </Link>
 
-        <nav className="flex items-center gap-6">
+        {user ? (
 
-          {navLinks.map((link) => (
+          <nav className="flex items-center gap-6">
 
-            <Link
-              key={link.href}
-              href={link.href}
-              className={cn(
-                "text-sm transition",
-                pathname === link.href
-                  ? "text-foreground font-semibold"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
+            {navLinks.map((link) => (
+
+              <Link
+                key={link.href}
+                href={link.href}
+                className={cn(
+                  "text-sm transition",
+                  pathname === link.href
+                    ? "text-foreground font-semibold"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {link.label}
+              </Link>
+
+            ))}
+
+            <ThemeToggle />
+
+            <Button
+              onClick={handleLogout}
+              size="sm"
+              variant="outline"
             >
-              {link.label}
-            </Link>
+              Logout
+            </Button>
 
-          ))}
+          </nav>
 
-          <ThemeToggle />
+        ) : (
 
-          <Button
-            onClick={handleLogout}
-            size="sm"
-            variant="outline"
-          >
-            Logout
-          </Button>
+          <nav className="flex items-center gap-4">
 
-        </nav>
+            <Button asChild size="sm">
+              <Link href="/">
+                Run Audit
+              </Link>
+            </Button>
+
+            <ThemeToggle />
+
+            <Button asChild size="sm" variant="outline">
+              <Link href="/login">
+                Login
+              </Link>
+            </Button>
+
+          </nav>
+
+        )}
 
       </div>
 
