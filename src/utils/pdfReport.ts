@@ -416,7 +416,7 @@ function drawPageBackground(
     color: theme.background
   })
 
-  page.drawText("AI Marketing OS", {
+  page.drawText("Quorai", {
     x: margin,
     y: 24,
     size: 9,
@@ -1381,7 +1381,7 @@ export async function generatePDFReport(
   pdfDoc.setTitle(
     `SEO Audit Report - ${safeText(audit.url)}`
   )
-  pdfDoc.setAuthor("AI Marketing OS")
+  pdfDoc.setAuthor("Quorai")
   pdfDoc.setSubject("Professional SEO audit report")
   pdfDoc.setCreationDate(new Date())
 
@@ -1407,7 +1407,7 @@ export async function generatePDFReport(
     color: theme.text
   })
 
-  cursor.page.drawText("AI Marketing OS", {
+  cursor.page.drawText("Quorai", {
     x: margin,
     y: cursor.y - 28,
     size: 12,

@@ -21,7 +21,7 @@ const faqs = [
       "Every crawled page is scored for classic technical SEO plus AEO (answer-engine optimization), AIO (AI-crawler access), and GEO (generative-engine citation readiness) — then the results feed an AI-generated content, campaign, and 90-day roadmap plan."
   },
   {
-    question: "Is AI Marketing OS free to use?",
+    question: "Is Quorai free to use?",
     answer:
       "Yes. Every audit and AI-generated recommendation runs on free-tier resources — there's no paid plan required to get a full report."
   },

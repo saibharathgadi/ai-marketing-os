@@ -43,7 +43,7 @@ export default function Navbar() {
           href="/dashboard"
           className="text-xl font-bold bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent"
         >
-          AI Marketing OS
+          Quorai
         </Link>
 
         <nav className="flex items-center gap-6">
