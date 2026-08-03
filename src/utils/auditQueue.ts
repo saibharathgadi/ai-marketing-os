@@ -7,7 +7,8 @@ import { validateWebsiteUrl } from "./urlValidation"
 type AuditQueueJob = {
   id: string
   url: string
-  orgId: string
+  orgId: string | null
+  maxPages?: number
   lockKey: string
   enqueuedAt: number
   startedAt?: number
@@ -158,7 +159,13 @@ async function runJob(job: AuditQueueJob) {
 
   try {
     const result =
-      await crawlWebsite(job.url, job.orgId)
+      await crawlWebsite(
+        job.url,
+        job.orgId,
+        job.maxPages
+          ? { maxPages: job.maxPages }
+          : undefined
+      )
 
     if (!result.success) {
       completeJob(job, {
@@ -228,7 +235,11 @@ function processQueue() {
 
 export async function enqueueAudit(
   url: string,
-  orgId: string
+  orgId: string | null,
+  options?: {
+    lockKey?: string
+    maxPages?: number
+  }
 ): Promise<QueuedAuditResult> {
   const urlValidation =
     validateWebsiteUrl(url)
@@ -251,8 +262,11 @@ export async function enqueueAudit(
   // Locking is per (org, url) — two different organizations auditing
   // the same public URL at the same time isn't a race condition once
   // audits are org-scoped, only two crawls of the same URL within the
-  // same org are.
+  // same org are. Anonymous (org-less) callers pass an explicit
+  // IP-scoped lockKey instead, so one visitor can't run concurrent
+  // teaser crawls of the same URL.
   const lockKey =
+    options?.lockKey ??
     `${orgId}:${normalizedUrl}`
 
   if (state.activeUrls.has(lockKey)) {
@@ -294,6 +308,7 @@ export async function enqueueAudit(
           .slice(2)}`,
       url: normalizedUrl,
       orgId,
+      maxPages: options?.maxPages,
       lockKey,
       enqueuedAt: Date.now(),
       resolve

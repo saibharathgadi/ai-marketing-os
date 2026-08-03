@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { isSafeRedirectPath } from "@/lib/utils"
 
 function GoogleIcon() {
   return (
@@ -47,6 +48,12 @@ export default function LoginForm() {
 
   const [notice, setNotice] = useState("")
 
+  const nextParam = searchParams.get("next")
+
+  const redirectTarget = isSafeRedirectPath(nextParam)
+    ? nextParam
+    : "/dashboard"
+
   const signInWithGoogle = async () => {
 
     try {
@@ -59,7 +66,7 @@ export default function LoginForm() {
         await supabase.auth.signInWithOAuth({
           provider: "google",
           options: {
-            redirectTo: `${window.location.origin}/auth/callback`
+            redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectTarget)}`
           }
         })
 
@@ -134,7 +141,7 @@ export default function LoginForm() {
         return
       }
 
-      router.push("/dashboard")
+      router.push(redirectTarget)
 
     } catch {
 

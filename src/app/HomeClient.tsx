@@ -1,10 +1,10 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
+import { useEffect, useRef, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 
 type AnalyzeResponse = {
   success: boolean
@@ -13,6 +13,52 @@ type AnalyzeResponse = {
     auditId: string
   }
 }
+
+const howItWorks = [
+  {
+    title: "Enter your URL",
+    description:
+      "Drop in any website address — no account setup or tracking script needed to see a preview."
+  },
+  {
+    title: "We crawl & score it",
+    description:
+      "A full-site crawl scores every page for technical SEO, AEO, AIO, and GEO in 20-45 seconds."
+  },
+  {
+    title: "Get your AI plan",
+    description:
+      "AI-generated content, campaign, and a 90-day roadmap, built straight from your audit results."
+  }
+]
+
+const features = [
+  {
+    title: "Technical SEO",
+    description:
+      "Meta tags, headings, word count, and classic on-page issues scored across every crawled page."
+  },
+  {
+    title: "AEO",
+    description:
+      "Answer-engine optimization — how well a page is structured to be picked as a direct answer by tools like Google's AI Overviews."
+  },
+  {
+    title: "AIO",
+    description:
+      "AI-crawler access — whether AI bots can actually reach and read your content in the first place."
+  },
+  {
+    title: "GEO",
+    description:
+      "Generative-engine citation readiness — how likely a page is to be cited by tools like ChatGPT and Perplexity."
+  },
+  {
+    title: "AI Content & Campaigns",
+    description:
+      "A content, campaign, and 90-day roadmap plan generated from your audit — ready to save straight into Content Studio and Campaign Builder."
+  }
+]
 
 const faqs = [
   {
@@ -38,7 +84,7 @@ const faqs = [
   {
     question: "Do I need an account to run an audit?",
     answer:
-      "Yes — audits are saved to your account so you can track score changes over time, schedule recurring audits, and revisit past reports."
+      "No — anyone can run a free preview audit without signing up. Creating a free account unlocks the full multi-page crawl, AI-generated insights, and saves your audits so you can track score changes over time."
   }
 ]
 
@@ -55,12 +101,57 @@ const faqStructuredData = {
   }))
 }
 
+function normalizeAndValidateUrl(
+  rawUrl: string
+): { success: true; url: string } | { success: false; error: string } {
+
+  if (!rawUrl.trim()) {
+    return {
+      success: false,
+      error: "Please enter a website URL."
+    }
+  }
+
+  let normalizedUrl = rawUrl.trim()
+
+  if (
+    !normalizedUrl.startsWith("http://") &&
+    !normalizedUrl.startsWith("https://")
+  ) {
+    normalizedUrl = `https://${normalizedUrl}`
+  }
+
+  try {
+
+    const parsedUrl = new URL(normalizedUrl)
+
+    if (!parsedUrl.hostname.includes(".")) {
+      return {
+        success: false,
+        error: "Please enter a valid website URL."
+      }
+    }
+
+  } catch {
+
+    return {
+      success: false,
+      error: "Please enter a valid website URL."
+    }
+
+  }
+
+  return { success: true, url: normalizedUrl }
+
+}
+
 export default function HomeClient() {
 
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const [url, setUrl] =
-    useState("")
+    useState(() => searchParams.get("url") ?? "")
 
   const [loading, setLoading] =
     useState(false)
@@ -68,57 +159,20 @@ export default function HomeClient() {
   const [error, setError] =
     useState<string | null>(null)
 
-  const [requiresLogin, setRequiresLogin] =
-    useState(false)
+  const hasAutoTriggered = useRef(false)
 
-  async function handleAnalyze() {
+  async function runAnalysis(rawUrl: string) {
 
-    if (!url.trim()) {
-      setError("Please enter a website URL.")
+    const validation =
+      normalizeAndValidateUrl(rawUrl)
+
+    if (!validation.success) {
+      setError(validation.error)
       return
-    }
-
-    let normalizedUrl =
-      url.trim()
-
-    if (
-      !normalizedUrl.startsWith(
-        "http://"
-      ) &&
-      !normalizedUrl.startsWith(
-        "https://"
-      )
-    ) {
-
-      normalizedUrl =
-        `https://${normalizedUrl}`
-
-    }
-
-    try {
-
-      const parsedUrl =
-        new URL(normalizedUrl)
-
-      if (
-        !parsedUrl.hostname.includes(".")
-      ) {
-
-        setError("Please enter a valid website URL.")
-        return
-
-      }
-
-    } catch {
-
-      setError("Please enter a valid website URL.")
-      return
-
     }
 
     setLoading(true)
     setError(null)
-    setRequiresLogin(false)
 
     try {
 
@@ -132,15 +186,9 @@ export default function HomeClient() {
           },
 
           body: JSON.stringify({
-            url: normalizedUrl
+            url: validation.url
           })
         })
-
-      if (response.status === 401) {
-        setRequiresLogin(true)
-        setLoading(false)
-        return
-      }
 
       const result: AnalyzeResponse =
         await response.json()
@@ -156,7 +204,9 @@ export default function HomeClient() {
 
       // Navigate straight to the full audit — health scores, AI
       // Marketing Copilot tabs, everything — rather than duplicating a
-      // stripped-down summary on this page.
+      // stripped-down summary on this page. Anonymous visitors land on
+      // a trimmed teaser view of the same page; logged-in users land
+      // on the full report.
       router.push(`/audit/${result.data.auditId}`)
 
     } catch (error) {
@@ -173,6 +223,36 @@ export default function HomeClient() {
 
   }
 
+  function handleAnalyze() {
+    void runAnalysis(url)
+  }
+
+  // Continuation from the teaser-audit login CTA: `/?url=...` prefills
+  // and immediately re-runs a full audit under the now-authenticated
+  // session, rather than making the user retype the URL.
+  useEffect(() => {
+
+    if (hasAutoTriggered.current) {
+      return
+    }
+
+    const prefillUrl = searchParams.get("url")
+
+    if (!prefillUrl) {
+      return
+    }
+
+    hasAutoTriggered.current = true
+
+    // setState only happens after runAnalysis' internal `await`
+    // resolves, never synchronously within this effect — fetch-on-mount,
+    // not a cascading-render risk.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void runAnalysis(prefillUrl)
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+
   return (
 
     <main className="relative min-h-screen bg-background text-foreground overflow-hidden">
@@ -182,7 +262,9 @@ export default function HomeClient() {
         className="pointer-events-none absolute inset-0 -z-10 bg-[image:var(--gradient-glow)]"
       />
 
-      <div className="max-w-3xl mx-auto px-6 py-20">
+      <div className="max-w-5xl mx-auto px-6 py-20">
+
+        <div className="max-w-3xl mx-auto">
 
         <div className="text-center">
 
@@ -237,18 +319,6 @@ export default function HomeClient() {
 
         </Card>
 
-        {requiresLogin && (
-
-          <div className="mt-6 rounded-2xl border border-violet-500/20 bg-violet-500/10 p-6 text-violet-700 dark:text-violet-300">
-            Please{" "}
-            <Link href="/login" className="underline font-semibold">
-              log in
-            </Link>{" "}
-            to run a full audit.
-          </div>
-
-        )}
-
         {error && (
 
           <div className="mt-6 rounded-2xl border border-red-500/20 bg-red-500/10 p-6 text-red-700 dark:text-red-300">
@@ -257,7 +327,68 @@ export default function HomeClient() {
 
         )}
 
+        </div>
+
         <section className="mt-24">
+
+          <p className="text-muted-foreground text-sm uppercase tracking-wide text-center">
+            How It Works
+          </p>
+
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+
+            {howItWorks.map((step, index) => (
+
+              <Card
+                key={step.title}
+                className="rounded-2xl border border-border bg-card p-6"
+              >
+                <Badge className="size-8 rounded-full p-0 flex items-center justify-center text-sm">
+                  {index + 1}
+                </Badge>
+                <h3 className="text-lg font-semibold mt-4">
+                  {step.title}
+                </h3>
+                <p className="text-muted-foreground mt-2 leading-relaxed">
+                  {step.description}
+                </p>
+              </Card>
+
+            ))}
+
+          </div>
+
+        </section>
+
+        <section className="mt-24">
+
+          <p className="text-muted-foreground text-sm uppercase tracking-wide text-center">
+            What Gets Scored
+          </p>
+
+          <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+
+            {features.map((feature) => (
+
+              <Card
+                key={feature.title}
+                className="rounded-2xl border border-border bg-card p-6"
+              >
+                <h3 className="text-lg font-semibold bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">
+                  {feature.title}
+                </h3>
+                <p className="text-muted-foreground mt-2 leading-relaxed">
+                  {feature.description}
+                </p>
+              </Card>
+
+            ))}
+
+          </div>
+
+        </section>
+
+        <section className="mt-24 max-w-3xl mx-auto">
 
           <p className="text-muted-foreground text-sm uppercase tracking-wide text-center">
             FAQ

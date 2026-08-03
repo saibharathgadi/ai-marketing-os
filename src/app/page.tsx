@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { Suspense } from "react"
 import HomeClient from "./HomeClient"
 
 const title =
@@ -49,7 +50,12 @@ export default function Home() {
           __html: JSON.stringify(softwareApplicationStructuredData)
         }}
       />
-      <HomeClient />
+      {/* HomeClient reads the ?url= query param via useSearchParams,
+          which Next.js requires a Suspense boundary for so the rest of
+          the route can still prerender. */}
+      <Suspense fallback={null}>
+        <HomeClient />
+      </Suspense>
     </>
   )
 }

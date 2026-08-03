@@ -26,15 +26,34 @@ export async function POST(
 
   try {
 
+    const supabase = await createClient()
+    const orgId = await getCurrentOrgId(supabase)
+
+    // Anonymous visitors get a capped teaser crawl instead of a hard
+    // 401 — rate-limited more tightly since there's no org to hold
+    // accountable for abuse.
+    const isAnonymous = orgId === null
+
+    const rateLimitKey =
+      getRequestKey(
+        req,
+        isAnonymous ? "analyze-anon" : "analyze"
+      )
+
     const rateLimit =
-      checkRateLimit({
-        key: getRequestKey(
-          req,
-          "analyze"
-        ),
-        limit: 6,
-        windowMs: 60_000
-      })
+      checkRateLimit(
+        isAnonymous
+          ? {
+              key: rateLimitKey,
+              limit: 2,
+              windowMs: 10 * 60_000
+            }
+          : {
+              key: rateLimitKey,
+              limit: 6,
+              windowMs: 60_000
+            }
+      )
 
     if (!rateLimit.allowed) {
 
@@ -54,24 +73,6 @@ export async function POST(
                 rateLimit.retryAfterSeconds
               )
           }
-        }
-      )
-
-    }
-
-    const supabase = await createClient()
-    const orgId = await getCurrentOrgId(supabase)
-
-    if (!orgId) {
-
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Authentication required."
-        },
-        {
-          status: 401
         }
       )
 
@@ -134,39 +135,53 @@ export async function POST(
     const result =
       await enqueueAudit(
         urlValidation.url,
-        orgId
+        orgId,
+        isAnonymous
+          ? {
+              lockKey: `${rateLimitKey}:${urlValidation.url}`,
+              maxPages: 2
+            }
+          : undefined
       )
 
-    await updateMonitoredWebsiteDiagnostics({
-      id:
-        websiteId,
+    // Monitored-website diagnostics are an org concept (tracking a
+    // site over time) — nothing to attach them to for an anonymous
+    // teaser crawl. Checking `orgId` directly (not `isAnonymous`) so
+    // TypeScript narrows it to non-null below.
+    if (orgId) {
 
-      url:
-        urlValidation.url,
+      await updateMonitoredWebsiteDiagnostics({
+        id:
+          websiteId,
 
-      orgId,
+        url:
+          urlValidation.url,
 
-      success:
-        result.success,
+        orgId,
 
-      failureReason:
-        result.success
-          ? result.data
-              .failureReason
-          : result.failureReason,
+        success:
+          result.success,
 
-      durationMs:
-        result.success
-          ? result.data
-              .durationMs
-          : result.durationMs,
+        failureReason:
+          result.success
+            ? result.data
+                .failureReason
+            : result.failureReason,
 
-      isSlow:
-        result.success
-          ? result.data
-              .isSlow
-          : false
-    })
+        durationMs:
+          result.success
+            ? result.data
+                .durationMs
+            : result.durationMs,
+
+        isSlow:
+          result.success
+            ? result.data
+                .isSlow
+            : false
+      })
+
+    }
 
     // ======================================================
     // HANDLE FAILED AUDITS
@@ -205,11 +220,16 @@ export async function POST(
     // ======================================================
     // AI INSIGHT GENERATION
     // ======================================================
+    // Skipped for anonymous teaser audits — keeps the free preview
+    // fast and free of AI-provider cost; the audit page already
+    // hides the AI Copilot tabs when ai_insights is null.
 
     const aiInsights =
-      await generateAndPersistAuditInsights(
-        auditData
-      )
+      isAnonymous
+        ? null
+        : await generateAndPersistAuditInsights(
+            auditData
+          )
 
     // ======================================================
     // FINAL RESPONSE
