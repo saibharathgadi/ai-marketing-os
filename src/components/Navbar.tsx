@@ -13,7 +13,8 @@ const navLinks = [
   { href: "/", label: "New Audit" },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/content", label: "Content Studio" },
-  { href: "/campaigns", label: "Campaign Builder" }
+  { href: "/campaigns", label: "Campaign Builder" },
+  { href: "/blog", label: "Blog" }
 ]
 
 export default function Navbar() {
@@ -113,6 +114,18 @@ export default function Navbar() {
                 Run Audit
               </Link>
             </Button>
+
+            <Link
+              href="/blog"
+              className={cn(
+                "text-sm transition",
+                pathname.startsWith("/blog")
+                  ? "text-foreground font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Blog
+            </Link>
 
             <ThemeToggle />
 
