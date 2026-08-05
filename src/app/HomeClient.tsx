@@ -18,7 +18,7 @@ const howItWorks = [
   {
     title: "Enter your URL",
     description:
-      "Drop in any website address — no account setup or tracking script needed to see a preview."
+      "Drop in any website address. No account setup or tracking script needed to see a preview."
   },
   {
     title: "We crawl & score it",
@@ -32,6 +32,29 @@ const howItWorks = [
   }
 ]
 
+const challenges = [
+  {
+    challenge: "Your competitors show up in ChatGPT and AI Overviews. You don't.",
+    fix: "GEO scoring shows exactly what's blocking citation: missing schema, no FAQ structure, thin content."
+  },
+  {
+    challenge: "You don't know if AI crawlers can even read your site.",
+    fix: "AIO scoring checks whether GPTBot, ClaudeBot, and other AI crawlers can access your content at all."
+  },
+  {
+    challenge: "A real SEO audit takes an agency days and costs real money.",
+    fix: "A full site crawl finishes in 20-45 seconds, free, with no account needed for a preview."
+  },
+  {
+    challenge: "You get a score, then have to figure out what to do with it yourself.",
+    fix: "Every audit includes an AI-generated content, campaign, and 90-day roadmap plan built from your actual results."
+  },
+  {
+    challenge: "AI tools auto-publish things you never reviewed.",
+    fix: "Nothing auto-publishes here. You review every AI recommendation and manually save what you want into Content Studio or Campaign Builder."
+  }
+]
+
 const features = [
   {
     title: "Technical SEO",
@@ -41,22 +64,22 @@ const features = [
   {
     title: "AEO",
     description:
-      "Answer-engine optimization — how well a page is structured to be picked as a direct answer by tools like Google's AI Overviews."
+      "Answer-engine optimization: how well a page is structured to be picked as a direct answer by tools like Google's AI Overviews."
   },
   {
     title: "AIO",
     description:
-      "AI-crawler access — whether AI bots can actually reach and read your content in the first place."
+      "AI-crawler access: whether AI bots can actually reach and read your content in the first place."
   },
   {
     title: "GEO",
     description:
-      "Generative-engine citation readiness — how likely a page is to be cited by tools like ChatGPT and Perplexity."
+      "Generative-engine citation readiness: how likely a page is to be cited by tools like ChatGPT and Perplexity."
   },
   {
     title: "AI Content & Campaigns",
     description:
-      "A content, campaign, and 90-day roadmap plan generated from your audit — ready to save straight into Content Studio and Campaign Builder."
+      "A content, campaign, and 90-day roadmap plan generated from your audit, ready to save straight into Content Studio and Campaign Builder."
   }
 ]
 
@@ -64,12 +87,12 @@ const faqs = [
   {
     question: "What does a full audit check?",
     answer:
-      "Every crawled page is scored for classic technical SEO plus AEO (answer-engine optimization), AIO (AI-crawler access), and GEO (generative-engine citation readiness) — then the results feed an AI-generated content, campaign, and 90-day roadmap plan."
+      "Every crawled page is scored for classic technical SEO plus AEO (answer-engine optimization), AIO (AI-crawler access), and GEO (generative-engine citation readiness), then the results feed an AI-generated content, campaign, and 90-day roadmap plan."
   },
   {
     question: "Is Verolyx free to use?",
     answer:
-      "Yes. Every audit and AI-generated recommendation runs on free-tier resources — there's no paid plan required to get a full report."
+      "Yes. Every audit and AI-generated recommendation runs on free-tier resources, so there's no paid plan required to get a full report."
   },
   {
     question: "What are AEO and GEO, and why do they matter?",
@@ -79,12 +102,12 @@ const faqs = [
   {
     question: "How long does a crawl take?",
     answer:
-      "A full site crawl — sitemap discovery plus multi-level link following — typically takes 20-45 seconds depending on site size, then a short additional step generates the AI marketing plan."
+      "A full site crawl (sitemap discovery plus multi-level link following) typically takes 20-45 seconds depending on site size, then a short additional step generates the AI marketing plan."
   },
   {
     question: "Do I need an account to run an audit?",
     answer:
-      "No — anyone can run a free preview audit without signing up. Creating a free account unlocks the full multi-page crawl, AI-generated insights, and saves your audits so you can track score changes over time."
+      "No. Anyone can run a free preview audit without signing up. Creating a free account unlocks the full multi-page crawl, AI-generated insights, and saves your audits so you can track score changes over time."
   }
 ]
 
@@ -269,13 +292,22 @@ export default function HomeClient() {
         <div className="text-center">
 
           <h1 className="text-4xl md:text-5xl font-bold">
-            Run a Complete Digital Marketing Audit
+            Will AI Recommend You or Someone Else?
           </h1>
 
           <p className="text-muted-foreground mt-5 text-lg max-w-2xl mx-auto">
-            SEO, AEO, AIO, and GEO scoring, a full-site crawl, and an
-            AI-generated content, campaign, and roadmap plan — in one report.
+            Run a free instant audit to see if ChatGPT, Perplexity, and
+            Google&apos;s AI Overviews can find, read, and cite your site,
+            plus get a full SEO crawl and an AI-generated content, campaign,
+            and roadmap plan.
           </p>
+
+          <div className="flex flex-wrap items-center justify-center gap-2 mt-6 text-sm text-muted-foreground">
+            <span>GEO citation targets:</span>
+            <Badge variant="secondary">ChatGPT</Badge>
+            <Badge variant="secondary">Perplexity</Badge>
+            <Badge variant="secondary">Google AI Overviews</Badge>
+          </div>
 
         </div>
 
@@ -328,6 +360,37 @@ export default function HomeClient() {
         )}
 
         </div>
+
+        <section className="mt-24">
+
+          <p className="text-muted-foreground text-sm uppercase tracking-wide text-center">
+            Sound Familiar?
+          </p>
+
+          <div className="mt-8 space-y-3">
+
+            {challenges.map((item) => (
+
+              <div
+                key={item.challenge}
+                className="grid grid-cols-1 md:grid-cols-2 gap-3 rounded-2xl border border-border bg-card p-5"
+              >
+
+                <p className="text-muted-foreground">
+                  {item.challenge}
+                </p>
+
+                <p className="font-medium">
+                  {item.fix}
+                </p>
+
+              </div>
+
+            ))}
+
+          </div>
+
+        </section>
 
         <section className="mt-24">
 
