@@ -41,7 +41,7 @@ export async function POST(
       )
 
     const rateLimit =
-      checkRateLimit(
+      await checkRateLimit(
         isAnonymous
           ? {
               key: rateLimitKey,

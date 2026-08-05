@@ -13,7 +13,7 @@ export async function DELETE(
 ) {
 
   const rateLimit =
-    checkRateLimit({
+    await checkRateLimit({
       key: getRequestKey(
         request,
         "monitored-websites-delete"

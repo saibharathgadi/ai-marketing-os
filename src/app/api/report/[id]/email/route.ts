@@ -22,7 +22,7 @@ export async function POST(
 ) {
 
   const rateLimit =
-    checkRateLimit({
+    await checkRateLimit({
       key: getRequestKey(
         request,
         "email-report"

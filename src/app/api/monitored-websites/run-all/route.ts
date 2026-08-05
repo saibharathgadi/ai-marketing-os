@@ -20,7 +20,7 @@ export const maxDuration = 300
 export async function POST(request: Request) {
 
   const rateLimit =
-    checkRateLimit({
+    await checkRateLimit({
       key: getRequestKey(
         request,
         "run-all-monitored-websites"
