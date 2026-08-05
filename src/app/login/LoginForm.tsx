@@ -1,33 +1,61 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import Script from "next/script"
 import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { useTheme } from "@/components/ThemeProvider"
 import { isSafeRedirectPath } from "@/lib/utils"
 
-function GoogleIcon() {
-  return (
-    <svg viewBox="0 0 48 48" className="size-4" aria-hidden="true">
-      <path
-        fill="#FFC107"
-        d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"
-      />
-      <path
-        fill="#FF3D00"
-        d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"
-      />
-      <path
-        fill="#4CAF50"
-        d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0124 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"
-      />
-      <path
-        fill="#1976D2"
-        d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 01-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"
-      />
-    </svg>
-  )
+type GoogleCredentialResponse = {
+  credential: string
+}
+
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: {
+            client_id: string
+            callback: (response: GoogleCredentialResponse) => void
+            nonce: string
+          }) => void
+          renderButton: (
+            parent: HTMLElement,
+            options: {
+              theme: "outline" | "filled_black"
+              size: "large"
+              width: number
+            }
+          ) => void
+        }
+      }
+    }
+  }
+}
+
+// Supabase's documented pairing for signInWithIdToken: the *hashed*
+// nonce goes to Google (embedded in the returned JWT), the *raw* nonce
+// goes to Supabase (which re-hashes it to verify the token wasn't
+// captured and replayed).
+async function generateNonce() {
+  const raw = crypto.randomUUID()
+
+  const digest =
+    await crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(raw)
+    )
+
+  const hashed =
+    Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("")
+
+  return { raw, hashed }
 }
 
 export default function LoginForm() {
@@ -35,6 +63,10 @@ export default function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [supabase] = useState(createClient)
+  const { theme } = useTheme()
+
+  const googleButtonRef = useRef<HTMLDivElement>(null)
+  const rawNonceRef = useRef<string>("")
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -54,38 +86,74 @@ export default function LoginForm() {
     ? nextParam
     : "/dashboard"
 
-  const signInWithGoogle = async () => {
+  async function handleGoogleCredential(
+    response: GoogleCredentialResponse
+  ) {
 
     try {
 
-      setLoading(true)
       setError("")
-      setNotice("")
 
       const { error } =
-        await supabase.auth.signInWithOAuth({
+        await supabase.auth.signInWithIdToken({
           provider: "google",
-          options: {
-            redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectTarget)}`
-          }
+          token: response.credential,
+          nonce: rawNonceRef.current
         })
 
       if (error) {
         setError(error.message)
-        setLoading(false)
+        return
       }
 
-      // No setLoading(false) on success — the browser navigates away to
-      // Google's consent screen next, so there's no "stuck loading" state.
+      router.push(redirectTarget)
 
     } catch {
 
-      setError("Something went wrong")
-      setLoading(false)
+      setError("Google sign-in failed — please try again.")
 
     }
 
   }
+
+  async function initializeGoogleSignIn() {
+
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+
+    if (!clientId || !window.google || !googleButtonRef.current) {
+      return
+    }
+
+    const { raw, hashed } = await generateNonce()
+    rawNonceRef.current = raw
+
+    window.google.accounts.id.initialize({
+      client_id: clientId,
+      callback: handleGoogleCredential,
+      nonce: hashed
+    })
+
+    window.google.accounts.id.renderButton(
+      googleButtonRef.current,
+      {
+        theme: theme === "dark" ? "filled_black" : "outline",
+        size: "large",
+        width: 368
+      }
+    )
+
+  }
+
+  useEffect(() => {
+
+    if (window.google) {
+      initializeGoogleSignIn()
+    }
+
+    // Re-render the button if the user toggles theme after the script
+    // has already loaded once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [theme])
 
   const signUp = async () => {
 
@@ -159,6 +227,12 @@ export default function LoginForm() {
 
     <main className="relative min-h-screen bg-background text-foreground flex items-center justify-center overflow-hidden">
 
+      <Script
+        src="https://accounts.google.com/gsi/client"
+        strategy="afterInteractive"
+        onLoad={initializeGoogleSignIn}
+      />
+
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 -z-10 bg-[image:var(--gradient-glow)]"
@@ -174,16 +248,7 @@ export default function LoginForm() {
           Access your marketing dashboard.
         </p>
 
-        <Button
-          onClick={signInWithGoogle}
-          disabled={loading}
-          variant="outline"
-          size="lg"
-          className="mt-8 w-full py-3 h-auto gap-2"
-        >
-          <GoogleIcon />
-          Continue with Google
-        </Button>
+        <div ref={googleButtonRef} className="mt-8 flex justify-center" />
 
         <div className="mt-6 flex items-center gap-3 text-xs text-muted-foreground">
           <div className="h-px flex-1 bg-border" />
