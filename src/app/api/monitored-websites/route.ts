@@ -8,6 +8,7 @@ import {
   checkRateLimit,
   getRequestKey
 } from "@/utils/rateLimit"
+import { getPlanLimits } from "@/utils/planLimits"
 
 const monitoredWebsiteSelect =
   "id,url,last_audited_at,last_failure_reason,last_audit_duration_ms,last_audit_status,last_audit_is_slow,notification_email,created_at"
@@ -153,6 +154,42 @@ export async function POST(
       },
       {
         status: 401
+      }
+    )
+  }
+
+  const orgResponse =
+    await supabase
+      .from("organizations")
+      .select("plan")
+      .eq("id", orgId)
+      .single()
+
+  const plan = orgResponse.data?.plan ?? "free"
+
+  const { count: websiteCount } =
+    await supabase
+      .from("monitored_websites")
+      .select("*", {
+        count: "exact",
+        head: true
+      })
+      .eq("org_id", orgId)
+
+  if (
+    (websiteCount ?? 0) >=
+    getPlanLimits(plan).monitoredWebsites
+  ) {
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          plan === "pro"
+            ? "You've reached your plan's monitored website limit."
+            : "Free plan is limited to 1 monitored website. Upgrade to Pro to monitor more."
+      },
+      {
+        status: 403
       }
     )
   }
