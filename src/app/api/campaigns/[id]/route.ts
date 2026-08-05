@@ -14,7 +14,7 @@ export async function PATCH(
 ) {
 
   const rateLimit =
-    checkRateLimit({
+    await checkRateLimit({
       key: getRequestKey(
         request,
         "campaigns-update"
@@ -237,7 +237,7 @@ export async function DELETE(
 ) {
 
   const rateLimit =
-    checkRateLimit({
+    await checkRateLimit({
       key: getRequestKey(
         request,
         "campaigns-delete"

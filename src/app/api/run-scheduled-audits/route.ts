@@ -55,7 +55,7 @@ export async function GET(request: Request) {
   }
 
   const rateLimit =
-    checkRateLimit({
+    await checkRateLimit({
       key: getRequestKey(
         request,
         "scheduled-audits"

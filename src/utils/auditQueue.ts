@@ -3,19 +3,7 @@ import {
   crawlWebsite
 } from "./crawler"
 import { validateWebsiteUrl } from "./urlValidation"
-
-type AuditQueueJob = {
-  id: string
-  url: string
-  orgId: string | null
-  maxPages?: number
-  lockKey: string
-  enqueuedAt: number
-  startedAt?: number
-  resolve: (
-    result: QueuedAuditResult
-  ) => void
-}
+import { createServiceClient } from "@/lib/supabase/service"
 
 export type QueuedAuditResult =
   | {
@@ -51,37 +39,6 @@ export type AuditQueueSnapshot = {
   activeUrls: string[]
 }
 
-type AuditQueueState = {
-  activeCount: number
-  failedCount: number
-  failedByReason:
-    Partial<Record<CrawlFailureReason, number>>
-  queue: AuditQueueJob[]
-  activeUrls: Set<string>
-}
-
-const stateKey =
-  "__aiMarketingOsAuditQueue"
-
-const globalForAuditQueue =
-  globalThis as typeof globalThis & {
-    [stateKey]?: AuditQueueState
-  }
-
-const state =
-  globalForAuditQueue[stateKey] || {
-    activeCount: 0,
-    failedCount: 0,
-    failedByReason: {},
-    queue: [],
-    activeUrls: new Set<string>()
-  }
-
-globalForAuditQueue[stateKey] = state
-
-state.failedByReason =
-  state.failedByReason || {}
-
 function getPositiveIntegerEnv(
   key: string,
   fallback: number
@@ -110,127 +67,72 @@ export function getAuditQueueConfig() {
       getPositiveIntegerEnv(
         "CRAWL_QUEUE_MAX_SIZE",
         12
+      ),
+    staleAfterMs:
+      getPositiveIntegerEnv(
+        "CRAWL_QUEUE_STALE_MS",
+        360_000
       )
   }
 }
 
-export function getAuditQueueSnapshot():
-  AuditQueueSnapshot {
-  const config =
-    getAuditQueueConfig()
+// Backed by the audit_queue_jobs / audit_queue_failure_counts tables
+// (see the durable-audit-queue migration) instead of a globalThis
+// object, so the active-slot count, per-URL locks, and failure counters
+// are shared across concurrent serverless instances rather than reset
+// per cold start. There is no "queued" state anymore -- a row's
+// existence IS "currently running"; a request either claims a free slot
+// immediately or is rejected, it never waits.
+export async function getAuditQueueSnapshot():
+  Promise<AuditQueueSnapshot> {
+
+  const config = getAuditQueueConfig()
+  const supabase = createServiceClient()
+
+  const [jobsResult, failuresResult] =
+    await Promise.all([
+      supabase
+        .from("audit_queue_jobs")
+        .select("lock_key"),
+      supabase
+        .from("audit_queue_failure_counts")
+        .select("failure_reason, count")
+    ])
+
+  const activeUrls =
+    (jobsResult.data || []).map(
+      (row) => row.lock_key as string
+    )
+
+  const failedByReason =
+    Object.fromEntries(
+      (failuresResult.data || []).map(
+        (row) => [
+          row.failure_reason as CrawlFailureReason,
+          Number(row.count)
+        ]
+      )
+    ) as Partial<
+      Record<CrawlFailureReason, number>
+    >
+
+  const failed =
+    Object.values(failedByReason).reduce(
+      (sum, count) => sum + (count || 0),
+      0
+    )
 
   return {
-    active: state.activeCount,
-    running: state.activeCount,
-    queued: state.queue.length,
-    failed: state.failedCount,
-    failedByReason:
-      state.failedByReason,
+    active: activeUrls.length,
+    running: activeUrls.length,
+    queued: 0,
+    failed,
+    failedByReason,
     maxActive: config.maxActive,
     maxQueued: config.maxQueued,
-    activeUrls:
-      Array.from(state.activeUrls)
-  }
-}
-
-function completeJob(
-  job: AuditQueueJob,
-  result: QueuedAuditResult
-) {
-  if (!result.success) {
-    state.failedCount += 1
-    state.failedByReason[
-      result.failureReason
-    ] =
-      (state.failedByReason[
-        result.failureReason
-      ] || 0) + 1
+    activeUrls
   }
 
-  state.activeCount =
-    Math.max(state.activeCount - 1, 0)
-  state.activeUrls.delete(job.lockKey)
-  job.resolve(result)
-  processQueue()
-}
-
-async function runJob(job: AuditQueueJob) {
-  job.startedAt = Date.now()
-
-  try {
-    const result =
-      await crawlWebsite(
-        job.url,
-        job.orgId,
-        job.maxPages
-          ? { maxPages: job.maxPages }
-          : undefined
-      )
-
-    if (!result.success) {
-      completeJob(job, {
-        success: false,
-        status: "failed",
-        error:
-          result.error ||
-          "Audit failed.",
-        failureReason:
-          result.failureReason ||
-          "unknown",
-        durationMs:
-          result.durationMs,
-        queue:
-          getAuditQueueSnapshot()
-      })
-
-      return
-    }
-
-    completeJob(job, {
-      success: true,
-      status: "completed",
-      data: result,
-      queue:
-        getAuditQueueSnapshot()
-    })
-  } catch (error) {
-    console.error(error)
-
-    completeJob(job, {
-      success: false,
-      status: "failed",
-      error:
-        error instanceof Error
-          ? error.message
-          : "Audit failed.",
-      failureReason: "unknown",
-      durationMs:
-        Date.now() -
-        (job.startedAt || Date.now()),
-      queue:
-        getAuditQueueSnapshot()
-    })
-  }
-}
-
-function processQueue() {
-  const { maxActive } =
-    getAuditQueueConfig()
-
-  while (
-    state.activeCount < maxActive &&
-    state.queue.length > 0
-  ) {
-    const nextJob =
-      state.queue.shift()
-
-    if (!nextJob) {
-      return
-    }
-
-    state.activeCount += 1
-    void runJob(nextJob)
-  }
 }
 
 export async function enqueueAudit(
@@ -241,6 +143,7 @@ export async function enqueueAudit(
     maxPages?: number
   }
 ): Promise<QueuedAuditResult> {
+
   const urlValidation =
     validateWebsiteUrl(url)
 
@@ -252,7 +155,7 @@ export async function enqueueAudit(
       failureReason: "invalid_url",
       durationMs: 0,
       queue:
-        getAuditQueueSnapshot()
+        await getAuditQueueSnapshot()
     }
   }
 
@@ -269,23 +172,79 @@ export async function enqueueAudit(
     options?.lockKey ??
     `${orgId}:${normalizedUrl}`
 
-  if (state.activeUrls.has(lockKey)) {
-    return {
-      success: false,
-      status: "locked",
-      error:
-        "An audit is already running for this URL. Please wait for it to finish.",
-      failureReason: "queue_rejection",
-      durationMs: 0,
-      queue:
-        getAuditQueueSnapshot()
-    }
+  const config = getAuditQueueConfig()
+  const supabase = createServiceClient()
+
+  let startResult: {
+    claimed: boolean
+    reason: string
   }
 
-  const { maxQueued } =
-    getAuditQueueConfig()
+  try {
 
-  if (state.queue.length >= maxQueued) {
+    const { data, error } =
+      await supabase
+        .rpc("try_start_audit", {
+          p_lock_key: lockKey,
+          p_max_active: config.maxActive,
+          p_stale_after_ms:
+            config.staleAfterMs
+        })
+        .single()
+
+    if (error || !data) {
+      throw (
+        error ||
+        new Error(
+          "No slot-claim row returned."
+        )
+      )
+    }
+
+    startResult =
+      data as {
+        claimed: boolean
+        reason: string
+      }
+
+  } catch (error) {
+
+    console.error(
+      "Failed to claim an audit queue slot:",
+      error
+    )
+
+    // Fails closed (unlike the rate limiter) — a DB hiccup here should
+    // reject the request, not silently disable the dedup/concurrency
+    // guard and risk unbounded concurrent crawls.
+    return {
+      success: false,
+      status: "failed",
+      error:
+        "Unable to start the audit right now. Please try again shortly.",
+      failureReason: "unknown",
+      durationMs: 0,
+      queue:
+        await getAuditQueueSnapshot()
+    }
+
+  }
+
+  if (!startResult.claimed) {
+
+    if (startResult.reason === "locked") {
+      return {
+        success: false,
+        status: "locked",
+        error:
+          "An audit is already running for this URL. Please wait for it to finish.",
+        failureReason: "queue_rejection",
+        durationMs: 0,
+        queue:
+          await getAuditQueueSnapshot()
+      }
+    }
+
     return {
       success: false,
       status: "queue_full",
@@ -294,26 +253,96 @@ export async function enqueueAudit(
       failureReason: "queue_rejection",
       durationMs: 0,
       queue:
-        getAuditQueueSnapshot()
+        await getAuditQueueSnapshot()
     }
+
   }
 
-  state.activeUrls.add(lockKey)
+  const startedAt = Date.now()
 
-  return new Promise((resolve) => {
-    state.queue.push({
-      id:
-        `${Date.now()}-${Math.random()
-          .toString(36)
-          .slice(2)}`,
-      url: normalizedUrl,
-      orgId,
-      maxPages: options?.maxPages,
-      lockKey,
-      enqueuedAt: Date.now(),
-      resolve
+  try {
+
+    const result =
+      await crawlWebsite(
+        normalizedUrl,
+        orgId,
+        options?.maxPages
+          ? { maxPages: options.maxPages }
+          : undefined
+      )
+
+    if (!result.success) {
+
+      await supabase.rpc("finish_audit", {
+        p_lock_key: lockKey,
+        p_failure_reason:
+          result.failureReason ||
+          "unknown"
+      })
+
+      return {
+        success: false,
+        status: "failed",
+        error:
+          result.error ||
+          "Audit failed.",
+        failureReason:
+          result.failureReason ||
+          "unknown",
+        durationMs:
+          result.durationMs,
+        queue:
+          await getAuditQueueSnapshot()
+      }
+
+    }
+
+    await supabase.rpc("finish_audit", {
+      p_lock_key: lockKey,
+      p_failure_reason: null
     })
 
-    processQueue()
-  })
+    return {
+      success: true,
+      status: "completed",
+      data: result,
+      queue:
+        await getAuditQueueSnapshot()
+    }
+
+  } catch (error) {
+
+    console.error(error)
+
+    await supabase
+      .rpc("finish_audit", {
+        p_lock_key: lockKey,
+        p_failure_reason: "unknown"
+      })
+      .then(
+        () => {},
+        (releaseError) => {
+          console.error(
+            "Failed to release audit queue slot:",
+            releaseError
+          )
+        }
+      )
+
+    return {
+      success: false,
+      status: "failed",
+      error:
+        error instanceof Error
+          ? error.message
+          : "Audit failed.",
+      failureReason: "unknown",
+      durationMs:
+        Date.now() - startedAt,
+      queue:
+        await getAuditQueueSnapshot()
+    }
+
+  }
+
 }

@@ -1,3 +1,5 @@
+import { createServiceClient } from "@/lib/supabase/service"
+
 type RateLimitOptions = {
   key: string
   limit: number
@@ -9,38 +11,6 @@ type RateLimitResult = {
   remaining: number
   resetAt: number
   retryAfterSeconds: number
-}
-
-type RateLimitEntry = {
-  count: number
-  resetAt: number
-}
-
-const storeKey =
-  "__aiMarketingOsRateLimits"
-
-const globalForRateLimits =
-  globalThis as typeof globalThis & {
-    [storeKey]?: Map<string, RateLimitEntry>
-  }
-
-const rateLimitStore =
-  globalForRateLimits[storeKey] ||
-  new Map<string, RateLimitEntry>()
-
-globalForRateLimits[storeKey] =
-  rateLimitStore
-
-function pruneExpiredEntries(now: number) {
-  if (rateLimitStore.size < 500) {
-    return
-  }
-
-  for (const [key, entry] of rateLimitStore) {
-    if (entry.resetAt <= now) {
-      rateLimitStore.delete(key)
-    }
-  }
 }
 
 export function getRequestKey(
@@ -68,53 +38,65 @@ export function getRequestKey(
   return `${scope}:${vercelForwardedFor || forwardedFor || realIp || "unknown"}`
 }
 
-export function checkRateLimit({
+// Backed by the check_rate_limit Postgres function (single atomic
+// upsert -- see the durable-rate-limit migration) instead of a
+// globalThis Map, so limits are actually shared across concurrent
+// serverless instances rather than reset per cold start.
+export async function checkRateLimit({
   key,
   limit,
   windowMs
-}: RateLimitOptions): RateLimitResult {
-  const now = Date.now()
+}: RateLimitOptions): Promise<RateLimitResult> {
 
-  pruneExpiredEntries(now)
+  try {
 
-  const existing =
-    rateLimitStore.get(key)
+    const supabase = createServiceClient()
 
-  if (!existing || existing.resetAt <= now) {
-    const resetAt = now + windowMs
+    const { data, error } =
+      await supabase
+        .rpc("check_rate_limit", {
+          p_key: key,
+          p_limit: limit,
+          p_window_ms: windowMs
+        })
+        .single()
 
-    rateLimitStore.set(key, {
-      count: 1,
-      resetAt
-    })
+    if (error || !data) {
+      throw error || new Error("No rate limit row returned.")
+    }
+
+    const row =
+      data as {
+        allowed: boolean
+        remaining: number
+        reset_at: string
+        retry_after_seconds: number
+      }
+
+    return {
+      allowed: row.allowed,
+      remaining: row.remaining,
+      resetAt: new Date(row.reset_at).getTime(),
+      retryAfterSeconds: row.retry_after_seconds
+    }
+
+  } catch (error) {
+
+    // Rate limiting here is defense-in-depth, not the actual security
+    // boundary (RLS/auth are) -- a transient DB error should not turn
+    // into a full outage, so this fails open rather than closed.
+    console.error(
+      "Rate limit check failed, allowing request:",
+      error
+    )
 
     return {
       allowed: true,
-      remaining: Math.max(limit - 1, 0),
-      resetAt,
+      remaining: limit,
+      resetAt: Date.now() + windowMs,
       retryAfterSeconds: 0
     }
+
   }
 
-  if (existing.count >= limit) {
-    return {
-      allowed: false,
-      remaining: 0,
-      resetAt: existing.resetAt,
-      retryAfterSeconds:
-        Math.ceil(
-          (existing.resetAt - now) / 1000
-        )
-    }
-  }
-
-  existing.count += 1
-
-  return {
-    allowed: true,
-    remaining:
-      Math.max(limit - existing.count, 0),
-    resetAt: existing.resetAt,
-    retryAfterSeconds: 0
-  }
 }
