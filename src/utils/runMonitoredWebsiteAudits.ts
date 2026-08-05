@@ -127,6 +127,30 @@ export async function runMonitoredWebsiteAudits(
 
   const supabase = createServiceClient()
 
+  // The unattended cron sweep (no orgId) only monitors Pro orgs daily --
+  // Free tier gets manual audits only, via the interactive "Run
+  // Scheduled Audits" button (which always passes an orgId and is
+  // unaffected by this gate, since a human explicitly clicked it).
+  let proOrgIds: string[] | null = null
+
+  if (!orgId) {
+    const { data: proOrgs } =
+      await supabase
+        .from("organizations")
+        .select("id")
+        .eq("plan", "pro")
+
+    proOrgIds = (proOrgs || []).map((org) => org.id)
+
+    if (proOrgIds.length === 0) {
+      return {
+        success: true,
+        total: 0,
+        results: []
+      }
+    }
+  }
+
   let query =
     supabase
       .from("monitored_websites")
@@ -134,6 +158,8 @@ export async function runMonitoredWebsiteAudits(
 
   if (orgId) {
     query = query.eq("org_id", orgId)
+  } else if (proOrgIds) {
+    query = query.in("org_id", proOrgIds)
   }
 
   let { data: websites, error } =
@@ -157,6 +183,9 @@ export async function runMonitoredWebsiteAudits(
     if (orgId) {
       fallbackQuery =
         fallbackQuery.eq("org_id", orgId)
+    } else if (proOrgIds) {
+      fallbackQuery =
+        fallbackQuery.in("org_id", proOrgIds)
     }
 
     ({ data: websites, error } =

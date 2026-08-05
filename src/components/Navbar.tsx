@@ -14,7 +14,8 @@ const navLinks = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/content", label: "Content Studio" },
   { href: "/campaigns", label: "Campaign Builder" },
-  { href: "/blog", label: "Blog" }
+  { href: "/blog", label: "Blog" },
+  { href: "/settings/billing", label: "Billing" }
 ]
 
 export default function Navbar() {
@@ -125,6 +126,18 @@ export default function Navbar() {
               )}
             >
               Blog
+            </Link>
+
+            <Link
+              href="/pricing"
+              className={cn(
+                "text-sm transition",
+                pathname === "/pricing"
+                  ? "text-foreground font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Pricing
             </Link>
 
             <ThemeToggle />

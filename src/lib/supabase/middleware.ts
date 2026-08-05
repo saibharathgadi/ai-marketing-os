@@ -26,7 +26,12 @@ function isPublicPath(pathname: string) {
     // /login.
     pathname.startsWith("/blog") ||
     pathname === "/sitemap.xml" ||
-    pathname === "/robots.txt"
+    pathname === "/robots.txt" ||
+    // Marketing/SEO surface, needs to be visible before signup.
+    pathname === "/pricing" ||
+    // Stripe's webhook POST carries no Supabase session cookie; the
+    // route verifies the request itself via its signing secret.
+    pathname === "/api/webhooks/stripe"
   )
 }
 
