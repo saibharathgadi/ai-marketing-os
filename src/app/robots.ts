@@ -26,18 +26,14 @@ const answerEngineCrawlers = [
 
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: [
-      {
-        userAgent: "*",
-        allow: "/",
-        disallow
-      },
-      ...answerEngineCrawlers.map((userAgent) => ({
-        userAgent,
-        allow: "/",
-        disallow
-      }))
-    ],
+    rules: {
+      // A single rule with multiple userAgent entries produces one
+      // shared "User-agent:" group per the robots.txt spec, instead of
+      // repeating the same Allow/Disallow lines once per crawler.
+      userAgent: ["*", ...answerEngineCrawlers],
+      allow: "/",
+      disallow
+    },
     sitemap: `${baseUrl}/sitemap.xml`
   }
 }
