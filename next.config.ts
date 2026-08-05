@@ -8,18 +8,22 @@ import type { NextConfig } from "next";
 // bundles use eval() for HMR/source maps, which a strict script-src
 // silently breaks (scripts 200 but never execute, no hydration). Never
 // add it in production — the prod build doesn't need it.
+// Google Identity Services (the login page's "Sign in with Google"
+// button) needs its script allowed, its iframe/popup credential picker
+// allowed as a child frame, and its token-verification requests allowed.
 const scriptSrc =
   process.env.NODE_ENV === "development"
-    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
-    : "script-src 'self' 'unsafe-inline'";
+    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com"
+    : "script-src 'self' 'unsafe-inline' https://accounts.google.com";
 
 const contentSecurityPolicy = [
   "default-src 'self'",
   scriptSrc,
-  "style-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://accounts.google.com",
   "img-src 'self' data: https:",
   "font-src 'self' data:",
-  "connect-src 'self' https://*.supabase.co",
+  "connect-src 'self' https://*.supabase.co https://accounts.google.com",
+  "frame-src 'self' https://accounts.google.com",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'"
