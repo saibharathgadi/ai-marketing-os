@@ -190,13 +190,13 @@ export default function PricingClient() {
 
           </Card>
 
-          <Card className="rounded-2xl border border-primary bg-card p-6 relative">
-
-            <Badge className="absolute -top-3 left-6">
-              14-day free trial
-            </Badge>
+          <Card className="rounded-2xl border border-primary bg-card p-6">
 
             <CardHeader>
+
+              <Badge className="mb-2 w-fit">
+                14-day free trial
+              </Badge>
 
               <CardTitle className="text-2xl">
                 Pro
