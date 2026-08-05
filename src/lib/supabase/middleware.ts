@@ -20,7 +20,13 @@ function isPublicPath(pathname: string) {
     pathname === "/api/analyze" ||
     // Audit pages render a teaser (org-less) or a "please log in"
     // notice for anonymous visitors instead of redirecting away.
-    pathname.startsWith("/audit/")
+    pathname.startsWith("/audit/") ||
+    // Public marketing content, plus the crawler-facing routes that
+    // point at it — a bot hitting these must never get redirected to
+    // /login.
+    pathname.startsWith("/blog") ||
+    pathname === "/sitemap.xml" ||
+    pathname === "/robots.txt"
   )
 }
 
