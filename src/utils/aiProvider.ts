@@ -188,6 +188,158 @@ export async function generateGroundedResearch(
   }
 }
 
+export type GroundedCitation = {
+  uri: string
+  title: string
+  domain: string | null
+}
+
+export type GroundedCitationsResult = {
+  answer: string
+  citations: GroundedCitation[]
+  citedDomains: string[]
+}
+
+// Gemini's grounding chunks carry a vertexaisearch.cloud.google.com
+// redirect-proxy URL, not the cited site's real URL -- a bare
+// new URL(uri).hostname always yields Google's redirector domain, not
+// the source. Follow the redirect to get the real destination.
+async function resolveGroundingChunkDomain(
+  uri: string,
+  title: string
+): Promise<string | null> {
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 5_000)
+
+    let response: Response
+
+    try {
+      response = await fetch(uri, {
+        redirect: "follow",
+        signal: controller.signal
+      })
+    } finally {
+      clearTimeout(timeout)
+    }
+
+    const hostname = new URL(response.url).hostname.replace(/^www\./, "")
+
+    if (hostname && hostname !== "vertexaisearch.cloud.google.com") {
+      return hostname
+    }
+  } catch {
+    // Fall through to the title-based fallback below.
+  }
+
+  // Fallback only when the redirect-follow didn't resolve: some
+  // grounding chunks carry a bare hostname in `title` rather than a
+  // full page title. Never treat an arbitrary title as a domain --
+  // that would silently corrupt the citation list.
+  if (/^([a-z0-9-]+\.)+[a-z]{2,}$/i.test(title)) {
+    return title.replace(/^www\./, "")
+  }
+
+  return null
+}
+
+/**
+ * Same grounded-search mechanism as generateGroundedResearch, but also
+ * captures which sources Google's grounding actually cited (used for
+ * AI citation tracking -- "is this domain currently being cited for
+ * this query," not a numeric SERP rank). A deliberate sibling, not a
+ * refactor of generateGroundedResearch, so the existing one-shot
+ * research call in aiCopilot.ts is unaffected.
+ */
+export async function generateGroundedCitations(
+  query: string
+): Promise<GroundedCitationsResult | null> {
+  const apiKey = process.env.GEMINI_API_KEY
+
+  if (!apiKey) {
+    return null
+  }
+
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 20_000)
+
+    let response: Response
+
+    try {
+      response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: "user",
+                parts: [{ text: query }]
+              }
+            ],
+            tools: [{ google_search: {} }],
+            generationConfig: {
+              temperature: 0.3
+            }
+          }),
+          signal: controller.signal
+        }
+      )
+    } finally {
+      clearTimeout(timeout)
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        `Gemini grounded citations request failed with status ${response.status}`
+      )
+    }
+
+    const data = await response.json()
+    const candidate = data.candidates?.[0]
+
+    const answer = (candidate?.content?.parts ?? [])
+      .map((part: { text?: string }) => part.text ?? "")
+      .join("")
+      .trim()
+
+    const rawChunks: { web?: { uri?: string; title?: string } }[] =
+      candidate?.groundingMetadata?.groundingChunks ?? []
+
+    const citations = await Promise.all(
+      rawChunks
+        .filter((chunk) => chunk.web?.uri)
+        .map(async (chunk) => {
+          const uri = chunk.web!.uri!
+          const title = chunk.web!.title ?? ""
+
+          return {
+            uri,
+            title,
+            domain: await resolveGroundingChunkDomain(uri, title)
+          }
+        })
+    )
+
+    const citedDomains = Array.from(
+      new Set(
+        citations
+          .map((citation) => citation.domain)
+          .filter((domain): domain is string => domain !== null)
+      )
+    )
+
+    return { answer, citations, citedDomains }
+  } catch (error) {
+    console.error("Gemini grounded citations failed:", error)
+    return null
+  }
+}
+
 export type AIProviderSource = "gemini" | "openai" | "fallback"
 
 export async function generateStructuredJSON(

@@ -11,6 +11,7 @@ function isPublicPath(pathname: string) {
     ) ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api/run-scheduled-audits") ||
+    pathname.startsWith("/api/run-scheduled-keyword-checks") ||
     // The OAuth callback runs before a session cookie exists, so it must
     // stay reachable without one.
     pathname.startsWith("/auth/") ||
