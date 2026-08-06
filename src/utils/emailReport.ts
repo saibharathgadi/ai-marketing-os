@@ -41,11 +41,11 @@ type SendSeoReportEmailResult = {
   error?: string
 }
 
-const resendApiUrl = "https://api.resend.com/emails"
+export const resendApiUrl = "https://api.resend.com/emails"
 const defaultFromEmail =
   "Verolyx <onboarding@resend.dev>"
 
-function getFromEmail() {
+export function getFromEmail() {
   return (
     process.env.RESEND_FROM_EMAIL ||
     defaultFromEmail
@@ -58,7 +58,7 @@ function isValidEmail(email: string) {
   )
 }
 
-function escapeHtml(value: string) {
+export function escapeHtml(value: string) {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

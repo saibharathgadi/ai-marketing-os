@@ -7,11 +7,13 @@
 export const PLAN_LIMITS = {
   free: {
     monitoredWebsites: 1,
-    trackedKeywords: 3
+    trackedKeywords: 3,
+    teamSeats: 1
   },
   pro: {
     monitoredWebsites: 10,
-    trackedKeywords: 25
+    trackedKeywords: 25,
+    teamSeats: 5
   }
 } as const
 
