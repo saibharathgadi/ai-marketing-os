@@ -4,6 +4,10 @@
     {
       "path": "/api/run-scheduled-audits",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/run-scheduled-keyword-checks",
+      "schedule": "0 4 * * 1"
     }
   ]
 }

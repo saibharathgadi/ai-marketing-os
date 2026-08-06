@@ -14,6 +14,7 @@ const navLinks = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/content", label: "Content Studio" },
   { href: "/campaigns", label: "Campaign Builder" },
+  { href: "/keywords", label: "Keyword Tracking" },
   { href: "/blog", label: "Blog" },
   { href: "/settings/billing", label: "Billing" }
 ]
