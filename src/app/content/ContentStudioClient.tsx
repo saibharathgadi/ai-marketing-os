@@ -1,12 +1,12 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import Link from "next/link"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import ContentItemDialog from "@/components/ContentItemDialog"
+import ContentItemCard from "@/components/ContentItemCard"
+import ContentBoard from "@/components/ContentBoard"
 import {
   CONTENT_ITEM_TYPES,
   CONTENT_ITEM_STATUSES,
@@ -16,20 +16,6 @@ import {
   type ContentItemType
 } from "@/utils/contentItems"
 
-function statusVariant(status: ContentItemStatus) {
-  if (status === "published") return "default" as const
-  if (status === "drafted") return "secondary" as const
-  return "outline" as const
-}
-
-function formatRelativeDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric"
-  })
-}
-
 export default function ContentStudioClient() {
 
   const [items, setItems] =
@@ -37,6 +23,9 @@ export default function ContentStudioClient() {
 
   const [loading, setLoading] =
     useState(true)
+
+  const [viewMode, setViewMode] =
+    useState<"list" | "board">("list")
 
   const [typeFilter, setTypeFilter] =
     useState<ContentItemType | "all">("all")
@@ -92,6 +81,13 @@ export default function ContentStudioClient() {
 
   }, [])
 
+  // Board view visualizes status as columns, so a separate status filter
+  // on top of that would just hide whole columns for no clear reason —
+  // ignore it there without losing the value for when the user switches
+  // back to list view.
+  const effectiveStatusFilter =
+    viewMode === "board" ? "all" : statusFilter
+
   const filteredItems = useMemo(() => {
 
     return items.filter((item) => {
@@ -100,7 +96,7 @@ export default function ContentStudioClient() {
         return false
       }
 
-      if (statusFilter !== "all" && item.status !== statusFilter) {
+      if (effectiveStatusFilter !== "all" && item.status !== effectiveStatusFilter) {
         return false
       }
 
@@ -115,7 +111,7 @@ export default function ContentStudioClient() {
 
     })
 
-  }, [items, typeFilter, statusFilter, search])
+  }, [items, typeFilter, effectiveStatusFilter, search])
 
   function toggleSelected(id: string) {
 
@@ -231,17 +227,74 @@ export default function ContentStudioClient() {
 
   }
 
+  async function handleMoveStatus(id: string, newStatus: ContentItemStatus) {
+
+    try {
+
+      const response =
+        await fetch(`/api/content-items/${id}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ status: newStatus })
+        })
+
+      const result = await response.json()
+
+      if (!result.success) {
+        alert(result.error || "Failed to move item.")
+        return
+      }
+
+      handleItemUpdated(result.data)
+
+    } catch (error) {
+
+      console.error(error)
+      alert("Failed to move item.")
+
+    }
+
+  }
+
+  function openItem(item: ContentItem) {
+    setActiveItem(item)
+    setDialogOpen(true)
+  }
+
   return (
 
     <main className="min-h-screen bg-background text-foreground">
 
       <div className="max-w-7xl mx-auto px-6 py-16">
 
-        <div>
-          <h1 className="text-4xl font-bold">Content Studio</h1>
-          <p className="text-muted-foreground mt-2">
-            Saved content ideas from your audits — edit, track, and manage them here.
-          </p>
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+
+          <div>
+            <h1 className="text-4xl font-bold">Content Studio</h1>
+            <p className="text-muted-foreground mt-2">
+              Saved content ideas from your audits — edit, track, and manage them here.
+            </p>
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              variant={viewMode === "list" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setViewMode("list")}
+            >
+              List
+            </Button>
+            <Button
+              variant={viewMode === "board" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setViewMode("board")}
+            >
+              Board
+            </Button>
+          </div>
+
         </div>
 
         <Card className="rounded-2xl border border-border bg-card p-6 mt-8">
@@ -280,28 +333,32 @@ export default function ContentStudioClient() {
 
           </div>
 
-          <div className="flex flex-wrap gap-2 mt-4">
+          {viewMode === "list" && (
 
-            <Button
-              variant={statusFilter === "all" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setStatusFilter("all")}
-            >
-              All statuses
-            </Button>
+            <div className="flex flex-wrap gap-2 mt-4">
 
-            {CONTENT_ITEM_STATUSES.map((status) => (
               <Button
-                key={status}
-                variant={statusFilter === status ? "default" : "outline"}
+                variant={statusFilter === "all" ? "default" : "outline"}
                 size="sm"
-                onClick={() => setStatusFilter(status)}
+                onClick={() => setStatusFilter("all")}
               >
-                {status[0].toUpperCase() + status.slice(1)}
+                All statuses
               </Button>
-            ))}
 
-          </div>
+              {CONTENT_ITEM_STATUSES.map((status) => (
+                <Button
+                  key={status}
+                  variant={statusFilter === status ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setStatusFilter(status)}
+                >
+                  {status[0].toUpperCase() + status.slice(1)}
+                </Button>
+              ))}
+
+            </div>
+
+          )}
 
         </Card>
 
@@ -316,6 +373,14 @@ export default function ContentStudioClient() {
               ? "No saved content yet — save ideas from an audit's AI Marketing Copilot tabs to see them here."
               : "No content items match your filters."}
           </div>
+
+        ) : viewMode === "board" ? (
+
+          <ContentBoard
+            items={filteredItems}
+            onMoveStatus={handleMoveStatus}
+            onOpenItem={openItem}
+          />
 
         ) : (
 
@@ -362,67 +427,14 @@ export default function ContentStudioClient() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
 
               {filteredItems.map((item) => (
-
-                <Card
+                <ContentItemCard
                   key={item.id}
-                  className={`rounded-xl border p-5 cursor-pointer transition ${
-                    selectedIds.has(item.id)
-                      ? "border-violet-500/50 bg-card"
-                      : "border-border bg-card hover:border-muted-foreground/30"
-                  }`}
-                  onClick={() => {
-                    setActiveItem(item)
-                    setDialogOpen(true)
-                  }}
-                >
-
-                  <div className="flex items-start justify-between gap-2">
-
-                    <div className="flex flex-wrap gap-2">
-                      <Badge variant="outline">
-                        {contentItemTypeLabels[item.type]}
-                      </Badge>
-                      <Badge variant={statusVariant(item.status)}>
-                        {item.status}
-                      </Badge>
-                    </div>
-
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(item.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={() => toggleSelected(item.id)}
-                      className="h-4 w-4 rounded border-border bg-background accent-violet-500 mt-0.5"
-                    />
-
-                  </div>
-
-                  <h3 className="text-base font-semibold mt-3 line-clamp-2">
-                    {item.title}
-                  </h3>
-
-                  <div className="flex items-center justify-between mt-4 text-xs text-muted-foreground">
-
-                    {item.audit_id ? (
-                      <Link
-                        href={`/audit/${item.audit_id}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="hover:text-foreground truncate"
-                      >
-                        {item.site_url || "Source audit"}
-                      </Link>
-                    ) : (
-                      <span className="truncate">
-                        {item.site_url || "—"}
-                      </span>
-                    )}
-
-                    <span>{formatRelativeDate(item.created_at)}</span>
-
-                  </div>
-
-                </Card>
-
+                  item={item}
+                  variant="list"
+                  selected={selectedIds.has(item.id)}
+                  onToggleSelect={() => toggleSelected(item.id)}
+                  onClick={() => openItem(item)}
+                />
               ))}
 
             </div>
