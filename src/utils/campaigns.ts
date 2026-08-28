@@ -27,6 +27,35 @@ export type AdSet = {
   updated_at: string
 }
 
+export const BRIEF_STATUSES = ["draft", "ready"] as const
+
+export type BriefStatus = (typeof BRIEF_STATUSES)[number]
+
+export const briefStatusLabels: Record<BriefStatus, string> = {
+  draft: "Draft",
+  ready: "Ready"
+}
+
+export type LandingPageBriefSection = {
+  name: string
+  purpose: string
+  copyHint: string
+  expandedCopy: string
+}
+
+export type LandingPageBrief = {
+  id: string
+  campaign_id: string
+  org_id: string
+  title: string
+  target_offer: string
+  sections: LandingPageBriefSection[]
+  status: BriefStatus
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type Campaign = {
   id: string
   org_id: string
@@ -45,4 +74,5 @@ export type Campaign = {
   created_at: string
   updated_at: string
   ad_sets?: AdSet[]
+  landing_page_briefs?: LandingPageBrief[]
 }

@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { CAMPAIGN_STATUSES } from "@/utils/campaigns"
 import {
   checkRateLimit,
   getRequestKey
 } from "@/utils/rateLimit"
+
+const BRIEF_STATUSES = ["draft", "ready"] as const
 
 export async function PATCH(
   request: Request,
@@ -17,7 +18,7 @@ export async function PATCH(
     await checkRateLimit({
       key: getRequestKey(
         request,
-        "campaigns-update"
+        "landing-page-briefs-update"
       ),
       limit: 30,
       windowMs: 60_000
@@ -55,8 +56,7 @@ export async function PATCH(
     return NextResponse.json(
       {
         success: false,
-        error:
-          "Request body must be valid JSON."
+        error: "Request body must be valid JSON."
       },
       {
         status: 400
@@ -66,31 +66,23 @@ export async function PATCH(
 
   const input =
     body as {
-      name?: unknown
-      objective?: unknown
-      targetAudience?: unknown
-      keyMessage?: unknown
-      channels?: unknown
+      title?: unknown
       status?: unknown
-      budget?: unknown
-      startDate?: unknown
-      endDate?: unknown
       notes?: unknown
+      sections?: unknown
     }
 
   const updates: Record<string, unknown> = {}
 
-  if (input.name !== undefined) {
-    const name =
-      typeof input.name === "string"
-        ? input.name.trim()
-        : ""
+  if (input.title !== undefined) {
+    const title =
+      typeof input.title === "string" ? input.title.trim() : ""
 
-    if (!name) {
+    if (!title) {
       return NextResponse.json(
         {
           success: false,
-          error: "Campaign name cannot be empty."
+          error: "Title cannot be empty."
         },
         {
           status: 400
@@ -98,45 +90,14 @@ export async function PATCH(
       )
     }
 
-    updates.name = name
-  }
-
-  if (input.objective !== undefined) {
-    updates.objective =
-      typeof input.objective === "string"
-        ? input.objective
-        : null
-  }
-
-  if (input.targetAudience !== undefined) {
-    updates.target_audience =
-      typeof input.targetAudience === "string"
-        ? input.targetAudience
-        : null
-  }
-
-  if (input.keyMessage !== undefined) {
-    updates.key_message =
-      typeof input.keyMessage === "string"
-        ? input.keyMessage
-        : null
-  }
-
-  if (input.channels !== undefined) {
-    updates.channels =
-      Array.isArray(input.channels)
-        ? input.channels.filter(
-            (channel): channel is string =>
-              typeof channel === "string"
-          )
-        : []
+    updates.title = title
   }
 
   if (input.status !== undefined) {
     if (
       typeof input.status !== "string" ||
-      !CAMPAIGN_STATUSES.includes(
-        input.status as (typeof CAMPAIGN_STATUSES)[number]
+      !BRIEF_STATUSES.includes(
+        input.status as (typeof BRIEF_STATUSES)[number]
       )
     ) {
       return NextResponse.json(
@@ -153,35 +114,25 @@ export async function PATCH(
     updates.status = input.status
   }
 
-  if (input.budget !== undefined) {
-    updates.budget =
-      typeof input.budget === "number" &&
-      Number.isFinite(input.budget)
-        ? input.budget
-        : null
-  }
-
-  if (input.startDate !== undefined) {
-    updates.start_date =
-      typeof input.startDate === "string" &&
-      input.startDate
-        ? input.startDate
-        : null
-  }
-
-  if (input.endDate !== undefined) {
-    updates.end_date =
-      typeof input.endDate === "string" &&
-      input.endDate
-        ? input.endDate
-        : null
-  }
-
   if (input.notes !== undefined) {
     updates.notes =
-      typeof input.notes === "string"
-        ? input.notes
-        : null
+      typeof input.notes === "string" ? input.notes : null
+  }
+
+  if (input.sections !== undefined) {
+    if (!Array.isArray(input.sections)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "sections must be an array."
+        },
+        {
+          status: 400
+        }
+      )
+    }
+
+    updates.sections = input.sections
   }
 
   if (Object.keys(updates).length === 0) {
@@ -202,10 +153,10 @@ export async function PATCH(
 
   const updateResponse =
     await supabase
-      .from("campaigns")
+      .from("landing_page_briefs")
       .update(updates)
       .eq("id", id)
-      .select("*, ad_sets(*), landing_page_briefs(*)")
+      .select("*")
       .single()
 
   if (updateResponse.error) {
@@ -213,7 +164,7 @@ export async function PATCH(
     return NextResponse.json(
       {
         success: false,
-        error: "Campaign not found."
+        error: "Landing page brief not found."
       },
       {
         status: 404
@@ -240,7 +191,7 @@ export async function DELETE(
     await checkRateLimit({
       key: getRequestKey(
         request,
-        "campaigns-delete"
+        "landing-page-briefs-delete"
       ),
       limit: 20,
       windowMs: 60_000
@@ -273,25 +224,25 @@ export async function DELETE(
   const supabase = await createClient()
 
   // No manual org ownership check needed — the RLS delete policy on
-  // campaigns already restricts this to rows in organizations the current
-  // session's user belongs to. ad_sets cascade via their campaign_id FK.
+  // landing_page_briefs already restricts this to rows in organizations
+  // the current session's user belongs to.
   const { error } =
     await supabase
-      .from("campaigns")
+      .from("landing_page_briefs")
       .delete()
       .eq("id", id)
 
   if (error) {
 
     console.error(
-      "Failed to delete campaign:",
+      "Failed to delete landing page brief:",
       error
     )
 
     return NextResponse.json(
       {
         success: false,
-        error: "Failed to delete campaign."
+        error: "Failed to delete landing page brief."
       },
       {
         status: 500

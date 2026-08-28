@@ -16,7 +16,7 @@ export async function GET() {
   const response =
     await supabase
       .from("campaigns")
-      .select("*, ad_sets(*)")
+      .select("*, ad_sets(*), landing_page_briefs(*)")
       .order("created_at", {
         ascending: false
       })
@@ -179,7 +179,7 @@ export async function POST(
         channels,
         status: "draft"
       })
-      .select("*, ad_sets(*)")
+      .select("*, ad_sets(*), landing_page_briefs(*)")
       .single()
 
   if (insertResponse.error) {

@@ -8,12 +8,15 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import CampaignDialog from "@/components/CampaignDialog"
 import AdSetDialog from "@/components/AdSetDialog"
+import LandingPageBriefDialog from "@/components/LandingPageBriefDialog"
 import {
   CAMPAIGN_STATUSES,
   campaignStatusLabels,
+  briefStatusLabels,
   type AdSet,
   type Campaign,
-  type CampaignStatus
+  type CampaignStatus,
+  type LandingPageBrief
 } from "@/utils/campaigns"
 
 function statusVariant(status: CampaignStatus) {
@@ -57,6 +60,15 @@ export default function CampaignBuilderClient() {
     useState<AdSet | null>(null)
 
   const [activeAdSetCampaignId, setActiveAdSetCampaignId] =
+    useState<string | null>(null)
+
+  const [briefDialogOpen, setBriefDialogOpen] =
+    useState(false)
+
+  const [activeBrief, setActiveBrief] =
+    useState<LandingPageBrief | null>(null)
+
+  const [activeBriefCampaignId, setActiveBriefCampaignId] =
     useState<string | null>(null)
 
   async function loadCampaigns() {
@@ -132,6 +144,18 @@ export default function CampaignBuilderClient() {
     setAdSetDialogOpen(true)
   }
 
+  function openNewBrief(campaignId: string) {
+    setActiveBrief(null)
+    setActiveBriefCampaignId(campaignId)
+    setBriefDialogOpen(true)
+  }
+
+  function openEditBrief(campaignId: string, brief: LandingPageBrief) {
+    setActiveBrief(brief)
+    setActiveBriefCampaignId(campaignId)
+    setBriefDialogOpen(true)
+  }
+
   function handleCampaignSaved(saved: Campaign) {
 
     setCampaigns((prev) => {
@@ -186,6 +210,45 @@ export default function CampaignBuilderClient() {
       prev.map((campaign) => ({
         ...campaign,
         ad_sets: (campaign.ad_sets ?? []).filter((adSet) => adSet.id !== id)
+      }))
+    )
+
+  }
+
+  function handleBriefSaved(saved: LandingPageBrief) {
+
+    setCampaigns((prev) =>
+      prev.map((campaign) => {
+
+        if (campaign.id !== saved.campaign_id) {
+          return campaign
+        }
+
+        const existingBriefs = campaign.landing_page_briefs ?? []
+        const exists = existingBriefs.some((brief) => brief.id === saved.id)
+
+        return {
+          ...campaign,
+          landing_page_briefs: exists
+            ? existingBriefs.map((brief) =>
+                brief.id === saved.id ? saved : brief
+              )
+            : [...existingBriefs, saved]
+        }
+
+      })
+    )
+
+  }
+
+  function handleBriefDeleted(id: string) {
+
+    setCampaigns((prev) =>
+      prev.map((campaign) => ({
+        ...campaign,
+        landing_page_briefs: (campaign.landing_page_briefs ?? []).filter(
+          (brief) => brief.id !== id
+        )
       }))
     )
 
@@ -395,6 +458,74 @@ export default function CampaignBuilderClient() {
 
                 </div>
 
+                <div className="mt-4 pt-4 border-t border-border">
+
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                      Landing Page Briefs
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="xs"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openNewBrief(campaign.id)
+                      }}
+                    >
+                      + Generate Brief
+                    </Button>
+                  </div>
+
+                  {(campaign.landing_page_briefs ?? []).length === 0 ? (
+
+                    <p className="text-sm text-muted-foreground mt-2">
+                      No landing page briefs yet.
+                    </p>
+
+                  ) : (
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+
+                      {(campaign.landing_page_briefs ?? []).map((brief) => (
+
+                        <div
+                          key={brief.id}
+                          className="rounded-xl border border-border bg-background p-3 cursor-pointer hover:border-muted-foreground/30 transition"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            openEditBrief(campaign.id, brief)
+                          }}
+                        >
+
+                          <div className="flex items-center justify-between gap-2">
+                            <Badge
+                              variant={
+                                brief.status === "ready" ? "default" : "outline"
+                              }
+                            >
+                              {briefStatusLabels[brief.status]}
+                            </Badge>
+                          </div>
+
+                          <p className="text-sm mt-2 line-clamp-2 font-medium">
+                            {brief.title}
+                          </p>
+
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {brief.sections.length} section
+                            {brief.sections.length === 1 ? "" : "s"}
+                          </p>
+
+                        </div>
+
+                      ))}
+
+                    </div>
+
+                  )}
+
+                </div>
+
               </Card>
 
             ))}
@@ -421,6 +552,17 @@ export default function CampaignBuilderClient() {
           onOpenChange={setAdSetDialogOpen}
           onSaved={handleAdSetSaved}
           onDeleted={handleAdSetDeleted}
+        />
+      )}
+
+      {activeBriefCampaignId && (
+        <LandingPageBriefDialog
+          campaignId={activeBriefCampaignId}
+          brief={activeBrief}
+          open={briefDialogOpen}
+          onOpenChange={setBriefDialogOpen}
+          onSaved={handleBriefSaved}
+          onDeleted={handleBriefDeleted}
         />
       )}
 
