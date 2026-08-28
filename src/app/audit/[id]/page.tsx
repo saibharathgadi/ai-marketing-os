@@ -334,11 +334,21 @@ export default async function AuditDetailPage({
 
           {!isTeaserAudit && (
 
-            <Button asChild size="lg" className="h-auto py-3 px-6">
-              <Link href={`/api/report/${id}`}>
-                Download PDF
-              </Link>
-            </Button>
+            <div className="flex gap-3">
+
+              <Button asChild size="lg" className="h-auto py-3 px-6">
+                <Link href={`/api/report/${id}`}>
+                  Download PDF
+                </Link>
+              </Button>
+
+              <Button asChild variant="outline" size="lg" className="h-auto py-3 px-6">
+                <Link href={`/api/report/${id}/llms-txt`}>
+                  Download llms.txt
+                </Link>
+              </Button>
+
+            </div>
 
           )}
 
