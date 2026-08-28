@@ -607,6 +607,13 @@ type AIContextInput = {
   pageSamples?: PageSample[]
 
   competitorResearch?: string | null
+
+  brandProfile?: {
+    businessDescription: string | null
+    targetAudience: string | null
+    toneOfVoice: string | null
+    keyDifferentiators: string | null
+  } | null
 }
 
 export function buildAIContext(
@@ -658,7 +665,12 @@ export function buildAIContext(
     // real competitors and their content angles) — null when no Gemini
     // key is configured or the grounding call failed. See the system
     // prompt for how this is meant to be weighted against pageSamples.
-    competitorResearch: input.competitorResearch ?? null
+    competitorResearch: input.competitorResearch ?? null,
+
+    // User-authored brand context (see /settings/brand) — null for orgs
+    // that haven't filled one in, in which case generation behaves
+    // exactly as it did before this field existed.
+    brandProfile: input.brandProfile ?? null
   }
 }
 
@@ -771,7 +783,7 @@ export async function generateAIInsights(
 
   const result = await generateStructuredJSON({
     systemPrompt:
-      "You are a professional SEO, AEO/AIO/GEO, and full-funnel marketing intelligence assistant producing a 360-degree digital marketing audit. Ground every finding in the specific context provided — reference the site's actual URL, page titles, meta descriptions, and pageSamples[].contentSnippet (real extracted body text) where relevant instead of generic advice that could apply to any site. Accuracy over assumption: for any factual claim about the audited company or product — its name, ownership, parent company, or branding — prioritize what pageSamples and competitorResearch actually show over your own training data, which can be outdated (for example, a company that has since been divested, renamed, or acquired). If competitorResearch is present, treat it as current, live-researched ground truth: use its named competitors and their real content/marketing angles to make contentIdeas, socialIdeas, blogSeries, socialSeries, and adCampaigns concretely competitive and current rather than generic. If a fact is not supported by the provided context and you are not confident it is still current, phrase it cautiously rather than asserting it outright. Return valid JSON only, matching the required structure exactly.",
+      "You are a professional SEO, AEO/AIO/GEO, and full-funnel marketing intelligence assistant producing a 360-degree digital marketing audit. Ground every finding in the specific context provided — reference the site's actual URL, page titles, meta descriptions, and pageSamples[].contentSnippet (real extracted body text) where relevant instead of generic advice that could apply to any site. Accuracy over assumption: for any factual claim about the audited company or product — its name, ownership, parent company, or branding — prioritize what pageSamples and competitorResearch actually show over your own training data, which can be outdated (for example, a company that has since been divested, renamed, or acquired). If competitorResearch is present, treat it as current, live-researched ground truth: use its named competitors and their real content/marketing angles to make contentIdeas, socialIdeas, blogSeries, socialSeries, and adCampaigns concretely competitive and current rather than generic. If brandProfile is present, write contentIdeas, socialIdeas, blogSeries, socialSeries, adCampaigns, and adSets in the stated tone of voice, targeted at the stated audience, and reflecting the stated differentiators — treat it as the voice and perspective guide for everything you generate. If brandProfile is absent or a field within it is empty, proceed exactly as you would without it. If a fact is not supported by the provided context and you are not confident it is still current, phrase it cautiously rather than asserting it outright. Return valid JSON only, matching the required structure exactly.",
     userPrompt: `Context:\n${JSON.stringify(
       context,
       null,
@@ -896,6 +908,7 @@ export async function persistAIInsights(
 
 type AuditForInsights = {
   auditId?: string | null
+  orgId?: string | null
   siteUrl?: string | null
   crawledPages?: {
     url?: string
@@ -917,6 +930,43 @@ type AuditForInsights = {
     AnswerEngineSeoResult,
     "aeo" | "aio" | "geo"
   > | null
+}
+
+// Best-effort -- a missing row or fetch error resolves to null so an org
+// without a filled-in brand profile (or the anonymous-teaser path, which
+// never has an orgId) generates exactly as it did before this existed.
+// Uses the service client since this runs inside trusted system code
+// already invoked post-auth-check by both of this function's callers,
+// matching runScheduledKeywordChecks.ts's precedent.
+async function fetchBrandProfile(orgId: string) {
+  try {
+
+    const supabase = createServiceClient()
+
+    const { data } =
+      await supabase
+        .from("brand_profiles")
+        .select("business_description,target_audience,tone_of_voice,key_differentiators")
+        .eq("org_id", orgId)
+        .maybeSingle()
+
+    if (!data) {
+      return null
+    }
+
+    return {
+      businessDescription: data.business_description,
+      targetAudience: data.target_audience,
+      toneOfVoice: data.tone_of_voice,
+      keyDifferentiators: data.key_differentiators
+    }
+
+  } catch (error) {
+
+    console.error("Failed to fetch brand profile:", error)
+    return null
+
+  }
 }
 
 /**
@@ -977,6 +1027,11 @@ export async function generateAndPersistAuditInsights(
     const siteUrl =
       auditData.siteUrl ?? pages[0]?.url ?? null
 
+    const brandProfile =
+      auditData.orgId
+        ? await fetchBrandProfile(auditData.orgId)
+        : null
+
     const aiInsights =
       await generateAIInsights({
         seoScore,
@@ -995,7 +1050,8 @@ export async function generateAndPersistAuditInsights(
         answerEngineSeo:
           auditData.technicalSeo ?? null,
         siteUrl,
-        pageSamples
+        pageSamples,
+        brandProfile
       })
 
     await persistAIInsights(

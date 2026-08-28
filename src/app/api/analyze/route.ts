@@ -227,9 +227,10 @@ export async function POST(
     const aiInsights =
       isAnonymous
         ? null
-        : await generateAndPersistAuditInsights(
-            auditData
-          )
+        : await generateAndPersistAuditInsights({
+            ...auditData,
+            orgId
+          })
 
     // ======================================================
     // FINAL RESPONSE

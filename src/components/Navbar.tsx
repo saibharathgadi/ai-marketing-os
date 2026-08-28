@@ -16,6 +16,7 @@ const navLinks = [
   { href: "/campaigns", label: "Campaign Builder" },
   { href: "/keywords", label: "Keyword Tracking" },
   { href: "/blog", label: "Blog" },
+  { href: "/settings/brand", label: "Brand" },
   { href: "/settings/team", label: "Team" },
   { href: "/settings/billing", label: "Billing" }
 ]

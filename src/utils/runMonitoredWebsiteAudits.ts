@@ -220,9 +220,10 @@ export async function runMonitoredWebsiteAudits(
         )
 
       if (auditResult.success) {
-        await generateAndPersistAuditInsights(
-          auditResult.data
-        )
+        await generateAndPersistAuditInsights({
+          ...auditResult.data,
+          orgId: website.org_id
+        })
 
         await notifyIfRegressed(
           supabase,
