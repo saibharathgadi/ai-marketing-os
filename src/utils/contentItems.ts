@@ -33,6 +33,13 @@ export type ContentItem = {
   updated_at: string
 }
 
+export type CreativeVariation = {
+  headline: string
+  body: string
+  generatedAt: string
+  source: "gemini" | "openai" | "fallback"
+}
+
 export const contentItemTypeLabels: Record<ContentItemType, string> = {
   blog_idea: "Blog Idea",
   blog_series: "Blog Series",

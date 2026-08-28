@@ -15,7 +15,8 @@ import { Textarea } from "@/components/ui/textarea"
 import {
   contentItemTypeLabels,
   type ContentItem,
-  type ContentItemStatus
+  type ContentItemStatus,
+  type CreativeVariation
 } from "@/utils/contentItems"
 
 const statusOptions: { value: ContentItemStatus; label: string }[] = [
@@ -236,6 +237,83 @@ function ContentItemDialogInner({
   const [error, setError] =
     useState<string | null>(null)
 
+  // Seeded once from the item prop, then updated directly from the
+  // generate-creative response -- not re-read from `item` afterward, since
+  // this dialog's parent never refreshes the `item` prop mid-session (only
+  // its own `items` array, via onUpdated), so re-reading `item.body` here
+  // would just show stale variations until the dialog is closed and reopened.
+  const [variations, setVariations] =
+    useState<CreativeVariation[]>(
+      Array.isArray(item.body?.creativeVariations)
+        ? (item.body.creativeVariations as CreativeVariation[])
+        : []
+    )
+
+  const [generating, setGenerating] =
+    useState(false)
+
+  const [copiedIndex, setCopiedIndex] =
+    useState<number | null>(null)
+
+  async function handleGenerateCreative() {
+
+    setGenerating(true)
+    setError(null)
+
+    try {
+
+      const response =
+        await fetch(`/api/content-items/${item.id}/generate-creative`, {
+          method: "POST"
+        })
+
+      const result = await response.json()
+
+      if (!result.success) {
+        setError(result.error || "Failed to generate creative.")
+        return
+      }
+
+      const updatedVariations =
+        Array.isArray(result.data.body?.creativeVariations)
+          ? (result.data.body.creativeVariations as CreativeVariation[])
+          : []
+
+      setVariations(updatedVariations)
+      onUpdated(result.data)
+
+    } catch (err) {
+
+      console.error(err)
+      setError("Failed to generate creative.")
+
+    } finally {
+
+      setGenerating(false)
+
+    }
+
+  }
+
+  async function handleCopyVariation(variation: CreativeVariation, index: number) {
+
+    try {
+
+      await navigator.clipboard.writeText(
+        `${variation.headline}\n${variation.body}`
+      )
+
+      setCopiedIndex(index)
+      setTimeout(() => setCopiedIndex(null), 1500)
+
+    } catch (err) {
+
+      console.error(err)
+
+    }
+
+  }
+
   async function handleSave() {
 
     if (!item) return
@@ -333,6 +411,66 @@ function ContentItemDialogInner({
 
         <div className="rounded-xl border border-border bg-card p-4">
           {renderBody(item)}
+        </div>
+
+        <div className="rounded-xl border border-border bg-card p-4">
+
+          <div className="flex items-center justify-between gap-2">
+            <h4 className="text-sm font-semibold text-foreground">
+              Creative Variations
+            </h4>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleGenerateCreative}
+              disabled={generating}
+            >
+              {generating
+                ? "Generating…"
+                : variations.length > 0
+                  ? "Generate More"
+                  : "Generate Creative"}
+            </Button>
+          </div>
+
+          {variations.length === 0 ? (
+
+            <p className="text-sm text-muted-foreground mt-3">
+              No creative generated yet.
+            </p>
+
+          ) : (
+
+            <div className="space-y-3 mt-3">
+              {variations.map((variation, index) => (
+                <div
+                  key={index}
+                  className="rounded-lg border border-border bg-background p-3"
+                >
+                  <p className="text-sm font-medium text-foreground">
+                    {variation.headline}
+                  </p>
+                  {variation.body && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {variation.body}
+                    </p>
+                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    className="mt-2"
+                    onClick={() => handleCopyVariation(variation, index)}
+                  >
+                    {copiedIndex === index ? "Copied" : "Copy"}
+                  </Button>
+                </div>
+              ))}
+            </div>
+
+          )}
+
         </div>
 
         <div className="space-y-3">
