@@ -122,7 +122,7 @@ type PageSample = {
   contentSnippet: string
 }
 
-function deriveBrandName(siteUrl?: string | null) {
+export function deriveBrandName(siteUrl?: string | null) {
   if (!siteUrl) {
     return "This site"
   }

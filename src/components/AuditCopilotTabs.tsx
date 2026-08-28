@@ -8,6 +8,7 @@ import {
   TabsTrigger
 } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import SaveToContentStudioButton from "@/components/SaveToContentStudioButton"
 import SaveCampaignButton from "@/components/SaveCampaignButton"
 import SaveAdSetButton from "@/components/SaveAdSetButton"
@@ -146,6 +147,70 @@ export default function AuditCopilotTabs({
     })
   }
 
+  const [faqData, setFaqData] =
+    useState<{ faqs: { question: string; answer: string }[]; jsonLd: string } | null>(null)
+
+  const [faqGenerating, setFaqGenerating] =
+    useState(false)
+
+  const [faqError, setFaqError] =
+    useState<string | null>(null)
+
+  const [faqCopied, setFaqCopied] =
+    useState(false)
+
+  async function handleGenerateFaq() {
+
+    setFaqGenerating(true)
+    setFaqError(null)
+
+    try {
+
+      const response =
+        await fetch(`/api/audit/${auditId}/faq-schema`, {
+          method: "POST"
+        })
+
+      const result = await response.json()
+
+      if (!result.success) {
+        setFaqError(result.error || "Failed to generate FAQ schema.")
+        return
+      }
+
+      setFaqData(result.data)
+
+    } catch (error) {
+
+      console.error(error)
+      setFaqError("Failed to generate FAQ schema.")
+
+    } finally {
+
+      setFaqGenerating(false)
+
+    }
+
+  }
+
+  async function handleCopyFaqJsonLd() {
+
+    if (!faqData) return
+
+    try {
+
+      await navigator.clipboard.writeText(faqData.jsonLd)
+      setFaqCopied(true)
+      setTimeout(() => setFaqCopied(false), 1500)
+
+    } catch (error) {
+
+      console.error(error)
+
+    }
+
+  }
+
   return (
     <section className="mt-10 rounded-2xl border border-border bg-card p-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -166,6 +231,7 @@ export default function AuditCopilotTabs({
           <TabsTrigger value="landing">Landing Pages</TabsTrigger>
           <TabsTrigger value="serp">SERP & Keywords</TabsTrigger>
           <TabsTrigger value="roadmap">Roadmap & KPIs</TabsTrigger>
+          <TabsTrigger value="faq-schema">FAQ Schema</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-5 space-y-4">
@@ -717,6 +783,82 @@ export default function AuditCopilotTabs({
             ) : (
               <EmptyState label="a KPI framework" />
             )}
+          </SectionCard>
+        </TabsContent>
+
+        <TabsContent value="faq-schema" className="mt-5 space-y-4">
+          <SectionCard title="AI-Suggested FAQ Schema">
+
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm text-muted-foreground">
+                Generate ready-to-paste FAQPage structured data based on
+                this site&apos;s audit context.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleGenerateFaq}
+                disabled={faqGenerating}
+              >
+                {faqGenerating
+                  ? "Generating…"
+                  : faqData
+                    ? "Generate More"
+                    : "Generate FAQ Schema"}
+              </Button>
+            </div>
+
+            {faqError && (
+              <p className="text-sm text-red-400 mt-3">{faqError}</p>
+            )}
+
+            {!faqData ? (
+              <div className="mt-4">
+                <EmptyState label="an FAQ schema" />
+              </div>
+            ) : (
+              <div className="mt-4 space-y-4">
+
+                <div className="space-y-3">
+                  {faqData.faqs.map((faq, index) => (
+                    <div
+                      key={index}
+                      className="rounded-lg border border-border bg-card p-3"
+                    >
+                      <p className="text-sm font-medium text-foreground">
+                        {faq.question}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {faq.answer}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs text-muted-foreground">
+                      FAQPage JSON-LD — paste into your page&apos;s
+                      &lt;head&gt;
+                    </p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="xs"
+                      onClick={handleCopyFaqJsonLd}
+                    >
+                      {faqCopied ? "Copied" : "Copy"}
+                    </Button>
+                  </div>
+                  <pre className="rounded-lg border border-border bg-card p-3 text-xs text-foreground overflow-x-auto">
+                    {faqData.jsonLd}
+                  </pre>
+                </div>
+
+              </div>
+            )}
+
           </SectionCard>
         </TabsContent>
       </Tabs>
