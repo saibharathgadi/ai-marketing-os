@@ -9,6 +9,8 @@ import {
 } from "./urlValidation"
 import { isMissingColumnError } from "./schemaCompat"
 import { generateSiteSummary } from "./summary"
+import { getOrgPlanAndName } from "./organizations"
+import { checkInternalUsageAndAlert } from "./internalUsageMonitor"
 
 type TechnicalSeoResult = Awaited<
   ReturnType<typeof analyzeTechnicalSeo>
@@ -961,6 +963,18 @@ export async function crawlWebsite(
 
   const { averageSeoScore, totalIssues } =
     siteSummary
+
+  if (orgId) {
+    const { plan, name } =
+      await getOrgPlanAndName(createServiceClient(), orgId)
+
+    await checkInternalUsageAndAlert({
+      plan,
+      orgId,
+      orgName: name,
+      resource: "crawl-pages"
+    })
+  }
 
   let auditId: string | null = null
 

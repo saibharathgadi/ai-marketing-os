@@ -143,3 +143,30 @@ export function isMultiOrgGatedOrg(orgId: string): boolean {
 }
 
 export const ACTIVE_ORG_COOKIE_NAME = ACTIVE_ORG_COOKIE
+
+/**
+ * Looks up an org's plan and display name in one query — the two fields
+ * `checkInternalUsageAndAlert` needs at AI-generation and crawl call
+ * sites that only otherwise have an orgId in scope. Accepts either an
+ * RLS-scoped client (a member reading their own org) or the service
+ * client (background jobs with no session), since both expose the same
+ * `organizations` table shape.
+ */
+export async function getOrgPlanAndName(
+  supabase: SupabaseClient,
+  orgId: string
+): Promise<{ plan: string; name: string }> {
+
+  const { data } =
+    await supabase
+      .from("organizations")
+      .select("plan, name")
+      .eq("id", orgId)
+      .maybeSingle()
+
+  return {
+    plan: (data?.plan as string) ?? "free",
+    name: (data?.name as string) ?? "Untitled organization"
+  }
+
+}
