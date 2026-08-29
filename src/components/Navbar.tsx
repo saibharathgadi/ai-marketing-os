@@ -13,6 +13,7 @@ import {
   DropdownMenuItem
 } from "@/components/ui/dropdown-menu"
 import { ThemeToggle } from "@/components/ThemeToggle"
+import WorkspaceSwitcher from "@/components/WorkspaceSwitcher"
 import { cn } from "@/lib/utils"
 import { ChevronDownIcon, MenuIcon, XIcon } from "lucide-react"
 
@@ -100,6 +101,8 @@ export default function Navbar() {
         >
           Verolyx
         </Link>
+
+        {user && <WorkspaceSwitcher />}
 
         {user ? (
 

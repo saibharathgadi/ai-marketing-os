@@ -14,6 +14,18 @@ export const PLAN_LIMITS = {
     monitoredWebsites: 10,
     trackedKeywords: 25,
     teamSeats: 5
+  },
+  // No Verolyx subscription — for orgs we run ourselves (EasyStepIn,
+  // Elev8) rather than a customer's. Limits are generous, not absent:
+  // real usage should never be constrained, but a runaway bug shouldn't
+  // have an unlimited blast radius either. Cost control for this tier
+  // happens via src/utils/internalUsageMonitor.ts's alert threshold, not
+  // via these plan limits — set plan = 'internal' directly on an
+  // organizations row (no Stripe checkout involved) to grant it.
+  internal: {
+    monitoredWebsites: 50,
+    trackedKeywords: 200,
+    teamSeats: 10
   }
 } as const
 
