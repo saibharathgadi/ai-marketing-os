@@ -1,7 +1,9 @@
 "use client"
 
 import { useState } from "react"
+import { Bookmark, BookmarkCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useToast } from "@/components/ToastProvider"
 
 export default function SaveAdSetButton({
   campaignId,
@@ -22,6 +24,8 @@ export default function SaveAdSetButton({
 
   const [state, setState] =
     useState<"idle" | "saving" | "saved" | "error">("idle")
+
+  const { toast } = useToast()
 
   async function handleSave() {
 
@@ -49,6 +53,15 @@ export default function SaveAdSetButton({
 
       setState(result.success ? "saved" : "error")
 
+      if (result.success) {
+        toast({
+          title: "Ad set saved",
+          description: campaignName,
+          actionLabel: "View in Campaign Builder",
+          actionHref: "/campaigns"
+        })
+      }
+
     } catch (error) {
 
       console.error(error)
@@ -70,7 +83,7 @@ export default function SaveAdSetButton({
 
     <Button
       type="button"
-      variant="outline"
+      variant="default"
       size="xs"
       onClick={(e) => {
         e.stopPropagation()
@@ -78,8 +91,13 @@ export default function SaveAdSetButton({
       }}
       disabled={state === "saving" || state === "saved"}
     >
+      {state === "saved" ? (
+        <BookmarkCheck />
+      ) : (
+        <Bookmark />
+      )}
       {state === "saved"
-        ? "Saved ✓"
+        ? "Saved"
         : state === "saving"
           ? "Saving…"
           : state === "error"

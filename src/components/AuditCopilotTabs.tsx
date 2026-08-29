@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   Tabs,
   TabsContent,
@@ -102,7 +102,7 @@ function SectionCard({
   children: React.ReactNode
 }) {
   return (
-    <div className="rounded-xl border border-border bg-background p-5">
+    <div className="rounded-2xl border border-border border-l-2 border-l-violet-500/40 bg-card p-6">
       <h3 className="text-sm font-semibold text-foreground mb-3">{title}</h3>
       {children}
     </div>
@@ -146,6 +146,45 @@ export default function AuditCopilotTabs({
       return next
     })
   }
+
+  useEffect(() => {
+
+    // Seeds savedCampaignIds from campaigns already persisted for this
+    // audit, so reloading the page doesn't force re-saving a campaign
+    // before its ad sets can be saved again.
+    async function loadSavedCampaigns() {
+
+      try {
+
+        const response = await fetch("/api/campaigns")
+        const result = await response.json()
+
+        if (!result.success) return
+
+        const forThisAudit = (result.data as { id: string; audit_id: string | null; name: string }[])
+          .filter((campaign) => campaign.audit_id === auditId)
+
+        if (forThisAudit.length === 0) return
+
+        setSavedCampaignIds((prev) => {
+          const next = new Map(prev)
+          forThisAudit.forEach((campaign) => {
+            next.set(campaign.name, campaign.id)
+          })
+          return next
+        })
+
+      } catch (error) {
+
+        console.error(error)
+
+      }
+
+    }
+
+    loadSavedCampaigns()
+
+  }, [auditId])
 
   const [faqData, setFaqData] =
     useState<{ faqs: { question: string; answer: string }[]; jsonLd: string } | null>(null)
@@ -221,6 +260,11 @@ export default function AuditCopilotTabs({
             : "Rule-based (no AI key configured)"}
         </Badge>
       </div>
+
+      <p className="text-sm text-muted-foreground mt-2">
+        Explore the ideas below and save the ones you want — they&apos;ll show up in Content
+        Studio or Campaign Builder, ready to build out.
+      </p>
 
       <Tabs defaultValue="overview" className="mt-6">
         <TabsList variant="line" className="border-b border-border pb-0">
@@ -524,19 +568,7 @@ export default function AuditCopilotTabs({
                         </Badge>
                       ))}
                     </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <SaveToContentStudioButton
-                        auditId={auditId}
-                        siteUrl={siteUrl}
-                        type="ad_campaign"
-                        title={campaign.name}
-                        body={{
-                          objective: campaign.objective,
-                          targetAudience: campaign.targetAudience,
-                          keyMessage: campaign.keyMessage,
-                          channels: campaign.channels
-                        }}
-                      />
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
                       <SaveCampaignButton
                         auditId={auditId}
                         siteUrl={siteUrl}
@@ -548,6 +580,19 @@ export default function AuditCopilotTabs({
                         onSaved={(id) =>
                           handleCampaignSaved(campaign.name, id)
                         }
+                      />
+                      <SaveToContentStudioButton
+                        variant="ghost"
+                        auditId={auditId}
+                        siteUrl={siteUrl}
+                        type="ad_campaign"
+                        title={campaign.name}
+                        body={{
+                          objective: campaign.objective,
+                          targetAudience: campaign.targetAudience,
+                          keyMessage: campaign.keyMessage,
+                          channels: campaign.channels
+                        }}
                       />
                     </div>
                   </div>
@@ -582,7 +627,17 @@ export default function AuditCopilotTabs({
                       {adSet.suggestedBudgetSplit}
                     </p>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <SaveAdSetButton
+                        campaignId={
+                          savedCampaignIds.get(adSet.campaignName) ?? null
+                        }
+                        campaignName={adSet.campaignName}
+                        audienceAngle={adSet.audienceAngle}
+                        creativeAngle={adSet.creativeAngle}
+                        suggestedBudgetSplit={adSet.suggestedBudgetSplit}
+                      />
                       <SaveToContentStudioButton
+                        variant="ghost"
                         auditId={auditId}
                         siteUrl={siteUrl}
                         type="ad_set"
@@ -592,15 +647,6 @@ export default function AuditCopilotTabs({
                           creativeAngle: adSet.creativeAngle,
                           suggestedBudgetSplit: adSet.suggestedBudgetSplit
                         }}
-                      />
-                      <SaveAdSetButton
-                        campaignId={
-                          savedCampaignIds.get(adSet.campaignName) ?? null
-                        }
-                        campaignName={adSet.campaignName}
-                        audienceAngle={adSet.audienceAngle}
-                        creativeAngle={adSet.creativeAngle}
-                        suggestedBudgetSplit={adSet.suggestedBudgetSplit}
                       />
                     </div>
                   </div>

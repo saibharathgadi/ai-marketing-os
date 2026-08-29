@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import "./globals.css"
 import Navbar from "@/components/Navbar"
 import { ThemeProvider } from "@/components/ThemeProvider"
+import { AppToastProvider } from "@/components/ToastProvider"
 import { InlineScript } from "@/components/InlineScript"
 
 export const metadata: Metadata = {
@@ -46,9 +47,13 @@ export default function RootLayout({
 
         <ThemeProvider>
 
-          <Navbar />
+          <AppToastProvider>
 
-          {children}
+            <Navbar />
+
+            {children}
+
+          </AppToastProvider>
 
         </ThemeProvider>
 
