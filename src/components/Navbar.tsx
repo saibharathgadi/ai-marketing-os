@@ -6,8 +6,15 @@ import { usePathname, useRouter } from "next/navigation"
 import type { User } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem
+} from "@/components/ui/dropdown-menu"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { cn } from "@/lib/utils"
+import { ChevronDownIcon } from "lucide-react"
 
 const navLinks = [
   { href: "/", label: "New Audit" },
@@ -15,7 +22,14 @@ const navLinks = [
   { href: "/content", label: "Content Studio" },
   { href: "/campaigns", label: "Campaign Builder" },
   { href: "/keywords", label: "Keyword Tracking" },
-  { href: "/blog", label: "Blog" },
+  { href: "/blog", label: "Blog" }
+]
+
+// Account-configuration pages, grouped under a "Settings" dropdown rather
+// than sitting at the same visual weight as the daily-use tools above —
+// these were previously flat top-level links, which made the nav read as
+// 9 items with no hierarchy.
+const settingsLinks = [
   { href: "/settings/brand", label: "Brand" },
   { href: "/settings/team", label: "Team" },
   { href: "/settings/billing", label: "Billing" }
@@ -96,6 +110,29 @@ export default function Navbar() {
               </Link>
 
             ))}
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={cn(
+                    "flex items-center gap-1 text-sm transition",
+                    settingsLinks.some((link) => pathname === link.href)
+                      ? "text-foreground font-semibold"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Settings
+                  <ChevronDownIcon className="size-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {settingsLinks.map((link) => (
+                  <DropdownMenuItem key={link.href} asChild>
+                    <Link href={link.href}>{link.label}</Link>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             <ThemeToggle />
 

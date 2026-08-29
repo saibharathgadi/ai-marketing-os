@@ -6,10 +6,17 @@ import { createClient } from "@/lib/supabase/client"
 import { formatLocalTimestamp } from "@/lib/date"
 import DashboardCharts from "@/components/DashboardCharts"
 import MonitoredWebsites from "@/components/MonitoredWebsites"
+import StatCard from "@/components/StatCard"
 import { isMissingColumnError } from "@/utils/schemaCompat"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent
+} from "@/components/ui/tabs"
 
 type EngineScore = {
   score: number
@@ -573,391 +580,406 @@ export default function DashboardClient() {
 
         </div>
 
-        {!loading && audits.length > 0 && (
+        <Tabs defaultValue="overview" className="mt-10">
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-10">
+          <TabsList variant="line" className="border-b border-border pb-0">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+            <TabsTrigger value="sites">Sites & Audits</TabsTrigger>
+          </TabsList>
 
-            {[
-              { label: "SEO", value: healthAverages.seo },
-              { label: "AEO", value: healthAverages.aeo },
-              { label: "AIO", value: healthAverages.aio },
-              { label: "GEO", value: healthAverages.geo }
-            ].map((metric) => (
+          <TabsContent value="overview" className="mt-8 space-y-8">
 
-              <Card
-                key={metric.label}
-                className="border border-border bg-card px-6 py-5"
-              >
+            {!loading && audits.length > 0 && (
 
-                <p className="text-muted-foreground text-xs uppercase tracking-wide">
-                  Avg {metric.label}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+                <StatCard label="Avg SEO" value={healthAverages.seo ?? "—"} />
+                <StatCard label="Avg AEO" value={healthAverages.aeo ?? "—"} />
+                <StatCard label="Avg AIO" value={healthAverages.aio ?? "—"} />
+                <StatCard label="Avg GEO" value={healthAverages.geo ?? "—"} />
+
+              </div>
+
+            )}
+
+            {latestIdeas && (
+
+              <Card className="border border-border bg-card p-6">
+
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+
+                  <h2 className="text-lg font-semibold">
+                    Marketing Ideas — from your latest audit
+                  </h2>
+
+                  <Link
+                    href={`/audit/${latestIdeas.auditId}`}
+                    className="text-sm text-violet-400 hover:text-violet-700 dark:text-violet-300"
+                  >
+                    View full breakdown →
+                  </Link>
+
+                </div>
+
+                <p className="text-muted-foreground text-sm mt-1 break-all">
+                  {latestIdeas.url}
                 </p>
 
-                <h3 className="text-3xl font-bold mt-2 bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">
-                  {metric.value ?? "—"}
-                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-5">
+
+                  {latestIdeas.blogIdea && (
+
+                    <div className="rounded-xl bg-background border border-border p-4">
+                      <Badge variant="secondary">Blog</Badge>
+                      <p className="text-sm font-medium mt-2">
+                        {latestIdeas.blogIdea.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {latestIdeas.blogIdea.description}
+                      </p>
+                    </div>
+
+                  )}
+
+                  {latestIdeas.socialIdea && (
+
+                    <div className="rounded-xl bg-background border border-border p-4">
+                      <Badge variant="secondary">
+                        {latestIdeas.socialIdea.platform}
+                      </Badge>
+                      <p className="text-sm mt-2">
+                        {latestIdeas.socialIdea.idea}
+                      </p>
+                    </div>
+
+                  )}
+
+                  {latestIdeas.adCampaign && (
+
+                    <div className="rounded-xl bg-background border border-border p-4">
+                      <Badge variant="secondary">Ad Campaign</Badge>
+                      <p className="text-sm font-medium mt-2">
+                        {latestIdeas.adCampaign.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {latestIdeas.adCampaign.objective}
+                      </p>
+                    </div>
+
+                  )}
+
+                </div>
 
               </Card>
 
-            ))}
-
-          </div>
-
-        )}
-
-        {latestIdeas && (
-
-          <Card className="mt-8 border border-border bg-card p-6">
-
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-
-              <h2 className="text-lg font-semibold">
-                Marketing Ideas — from your latest audit
-              </h2>
-
-              <Link
-                href={`/audit/${latestIdeas.auditId}`}
-                className="text-sm text-violet-400 hover:text-violet-700 dark:text-violet-300"
-              >
-                View full breakdown →
-              </Link>
-
-            </div>
-
-            <p className="text-muted-foreground text-sm mt-1 break-all">
-              {latestIdeas.url}
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-5">
-
-              {latestIdeas.blogIdea && (
-
-                <div className="rounded-xl bg-background border border-border p-4">
-                  <Badge variant="secondary">Blog</Badge>
-                  <p className="text-sm font-medium mt-2">
-                    {latestIdeas.blogIdea.title}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {latestIdeas.blogIdea.description}
-                  </p>
-                </div>
-
-              )}
-
-              {latestIdeas.socialIdea && (
-
-                <div className="rounded-xl bg-background border border-border p-4">
-                  <Badge variant="secondary">
-                    {latestIdeas.socialIdea.platform}
-                  </Badge>
-                  <p className="text-sm mt-2">
-                    {latestIdeas.socialIdea.idea}
-                  </p>
-                </div>
-
-              )}
-
-              {latestIdeas.adCampaign && (
-
-                <div className="rounded-xl bg-background border border-border p-4">
-                  <Badge variant="secondary">Ad Campaign</Badge>
-                  <p className="text-sm font-medium mt-2">
-                    {latestIdeas.adCampaign.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {latestIdeas.adCampaign.objective}
-                  </p>
-                </div>
-
-              )}
-
-            </div>
-
-          </Card>
-
-        )}
-
-        <DashboardCharts
-          audits={audits}
-          queueMetrics={queueMetrics}
-        />
-
-        <MonitoredWebsites
-          onAuditCompleted={loadAudits}
-        />
-
-        {loading ? (
-
-          <div
-            className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mt-12"
-            role="status"
-            aria-label="Loading audits"
-          >
-
-            {Array.from({ length: 3 }).map(
-              (_, index) => (
-                <AuditCardSkeleton key={index} />
-              )
             )}
 
-          </div>
+            {!loading && audits.length === 0 && (
 
-        ) : audits.length === 0 ? (
+              <div className="rounded-2xl border border-border bg-card p-8">
 
-          <div className="mt-12 rounded-2xl border border-border bg-card p-8">
+                <h2 className="text-2xl font-semibold">
+                  No audits yet
+                </h2>
 
-            <h2 className="text-2xl font-semibold">
-              No audits yet
-            </h2>
+              </div>
 
-          </div>
+            )}
 
-        ) : (
+          </TabsContent>
 
-          <>
+          <TabsContent value="analytics" className="mt-8">
 
-            <div className="flex items-center justify-between gap-4 mt-12 flex-wrap">
+            <DashboardCharts
+              audits={audits}
+              queueMetrics={queueMetrics}
+            />
 
-              <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={
-                    selectedAuditIds.size > 0 &&
-                    selectedAuditIds.size === audits.length
-                  }
-                  onChange={toggleSelectAll}
-                  className="h-4 w-4 rounded border-border bg-background accent-violet-500"
-                />
-                {selectedAuditIds.size > 0
-                  ? `${selectedAuditIds.size} selected`
-                  : "Select all"}
-              </label>
+          </TabsContent>
 
-              {selectedAuditIds.size > 0 && (
-                <Button
-                  onClick={handleBulkDelete}
-                  disabled={bulkDeleting}
-                  variant="destructive"
-                  size="sm"
-                >
-                  {bulkDeleting
-                    ? "Deleting…"
-                    : `Delete ${selectedAuditIds.size} selected`}
-                </Button>
-              )}
+          <TabsContent value="sites" className="mt-8 space-y-8">
 
-            </div>
+            <MonitoredWebsites
+              onAuditCompleted={loadAudits}
+            />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mt-4">
-
-            {audits.map((audit) => (
+            {loading ? (
 
               <div
-                key={audit.id}
-                className={`rounded-2xl border p-6 transition ${
-                  selectedAuditIds.has(audit.id)
-                    ? "border-violet-500/50 bg-card"
-                    : "border-border bg-card"
-                }`}
+                className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
+                role="status"
+                aria-label="Loading audits"
               >
 
-                <div className="flex items-start justify-between gap-4">
+                {Array.from({ length: 3 }).map(
+                  (_, index) => (
+                    <AuditCardSkeleton key={index} />
+                  )
+                )}
 
-                  <div className="flex items-start gap-3 flex-1 min-w-0">
+              </div>
 
+            ) : audits.length === 0 ? (
+
+              <div className="rounded-2xl border border-border bg-card p-8">
+
+                <h2 className="text-2xl font-semibold">
+                  No audits yet
+                </h2>
+
+              </div>
+
+            ) : (
+
+              <>
+
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+
+                  <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
                     <input
                       type="checkbox"
-                      checked={selectedAuditIds.has(audit.id)}
-                      onChange={() =>
-                        toggleAuditSelected(audit.id)
+                      checked={
+                        selectedAuditIds.size > 0 &&
+                        selectedAuditIds.size === audits.length
                       }
-                      aria-label={`Select audit for ${audit.url}`}
-                      className="h-4 w-4 mt-1 rounded border-border bg-background accent-violet-500 shrink-0"
+                      onChange={toggleSelectAll}
+                      className="h-4 w-4 rounded border-border bg-background accent-violet-500"
                     />
+                    {selectedAuditIds.size > 0
+                      ? `${selectedAuditIds.size} selected`
+                      : "Select all"}
+                  </label>
 
-                    <Link
-                      href={`/audit/${audit.id}`}
-                      className="flex-1 min-w-0"
+                  {selectedAuditIds.size > 0 && (
+                    <Button
+                      onClick={handleBulkDelete}
+                      disabled={bulkDeleting}
+                      variant="destructive"
+                      size="sm"
                     >
-
-                      <p className="text-muted-foreground text-sm">
-                        Website
-                      </p>
-
-                      <h2 className="text-xl font-semibold mt-2 break-all">
-                        {audit.url}
-                      </h2>
-
-                    </Link>
-
-                  </div>
-
-                  <button
-                    onClick={() =>
-                      handleDelete(
-                        audit.id
-                      )
-                    }
-                    aria-label={`Delete audit for ${audit.url}`}
-                    title="Delete audit"
-                    className="text-muted-foreground hover:text-red-400 transition text-xl shrink-0"
-                  >
-                    ✕
-                  </button>
-
-                </div>
-
-                <div className="grid grid-cols-3 gap-4 mt-8">
-
-                  <div>
-
-                    <p className="text-muted-foreground text-xs">
-                      Score
-                    </p>
-
-                    <h3 className="text-3xl font-bold mt-1">
-                      {audit.average_score}
-                    </h3>
-
-                  </div>
-
-                  <div>
-
-                    <p className="text-muted-foreground text-xs">
-                      Pages
-                    </p>
-
-                    <h3 className="text-3xl font-bold mt-1">
-                      {audit.total_pages}
-                    </h3>
-
-                  </div>
-
-                  <div>
-
-                    <p className="text-muted-foreground text-xs">
-                      Issues
-                    </p>
-
-                    <h3 className="text-3xl font-bold mt-1">
-                      {audit.total_issues}
-                    </h3>
-
-                  </div>
-
-                </div>
-
-                <div className="flex flex-wrap gap-2 mt-6">
-                  <EngineScorePill
-                    label="AEO"
-                    engine={audit.technical_seo?.aeo}
-                  />
-                  <EngineScorePill
-                    label="AIO"
-                    engine={audit.technical_seo?.aio}
-                  />
-                  <EngineScorePill
-                    label="GEO"
-                    engine={audit.technical_seo?.geo}
-                  />
-                </div>
-
-                <p className="text-muted-foreground text-sm mt-4">
-                  {formatLocalTimestamp(
-                    audit.created_at
+                      {bulkDeleting
+                        ? "Deleting…"
+                        : `Delete ${selectedAuditIds.size} selected`}
+                    </Button>
                   )}
-                </p>
 
-                {audit.ai_insights ? (
+                </div>
 
-                  <div className="mt-6 rounded-xl border border-border bg-background p-4 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
 
-                    <div>
+                {audits.map((audit) => (
 
-                      <h3 className="text-sm font-semibold text-foreground">
-                        AI Executive Summary
-                      </h3>
+                  <div
+                    key={audit.id}
+                    className={`rounded-2xl border p-6 transition ${
+                      selectedAuditIds.has(audit.id)
+                        ? "border-violet-500/50 bg-card"
+                        : "border-border bg-card"
+                    }`}
+                  >
 
-                      <p className="text-sm text-muted-foreground mt-2">
-                        {
-                          audit.ai_insights
-                            .executiveSummary
+                    <div className="flex items-start justify-between gap-4">
+
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+
+                        <input
+                          type="checkbox"
+                          checked={selectedAuditIds.has(audit.id)}
+                          onChange={() =>
+                            toggleAuditSelected(audit.id)
+                          }
+                          aria-label={`Select audit for ${audit.url}`}
+                          className="h-4 w-4 mt-1 rounded border-border bg-background accent-violet-500 shrink-0"
+                        />
+
+                        <Link
+                          href={`/audit/${audit.id}`}
+                          className="flex-1 min-w-0"
+                        >
+
+                          <p className="text-muted-foreground text-sm">
+                            Website
+                          </p>
+
+                          <h2 className="text-xl font-semibold mt-2 break-all">
+                            {audit.url}
+                          </h2>
+
+                        </Link>
+
+                      </div>
+
+                      <button
+                        onClick={() =>
+                          handleDelete(
+                            audit.id
+                          )
                         }
-                      </p>
+                        aria-label={`Delete audit for ${audit.url}`}
+                        title="Delete audit"
+                        className="text-muted-foreground hover:text-red-400 transition text-xl shrink-0"
+                      >
+                        ✕
+                      </button>
 
                     </div>
 
-                    <div>
-
-                      <h4 className="text-sm font-medium text-foreground">
-                        Weekly Focus
-                      </h4>
-
-                      <p className="text-sm text-muted-foreground mt-2">
-                        {
-                          audit.ai_insights
-                            .weeklyFocus
-                        }
-                      </p>
-
-                    </div>
-
-                    {Array.isArray(
-                      audit.ai_insights
-                        .priorityActions
-                    ) &&
-                      audit.ai_insights
-                        .priorityActions.length >
-                        0 && (
+                    <div className="grid grid-cols-3 gap-4 mt-8">
 
                       <div>
 
-                        <h4 className="text-sm font-medium text-foreground mb-2">
-                          Top Priorities
-                        </h4>
+                        <p className="text-muted-foreground text-xs">
+                          Score
+                        </p>
 
-                        <ul className="space-y-2 text-sm text-foreground">
-
-                          {audit.ai_insights.priorityActions
-                            .slice(0, 3)
-                            .map(
-                              (
-                                action,
-                                index
-                              ) => (
-
-                                <li key={index}>
-                                  {action.title}
-                                </li>
-
-                              )
-                            )}
-
-                        </ul>
+                        <h3 className="text-3xl font-bold mt-1">
+                          {audit.average_score}
+                        </h3>
 
                       </div>
+
+                      <div>
+
+                        <p className="text-muted-foreground text-xs">
+                          Pages
+                        </p>
+
+                        <h3 className="text-3xl font-bold mt-1">
+                          {audit.total_pages}
+                        </h3>
+
+                      </div>
+
+                      <div>
+
+                        <p className="text-muted-foreground text-xs">
+                          Issues
+                        </p>
+
+                        <h3 className="text-3xl font-bold mt-1">
+                          {audit.total_issues}
+                        </h3>
+
+                      </div>
+
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 mt-6">
+                      <EngineScorePill
+                        label="AEO"
+                        engine={audit.technical_seo?.aeo}
+                      />
+                      <EngineScorePill
+                        label="AIO"
+                        engine={audit.technical_seo?.aio}
+                      />
+                      <EngineScorePill
+                        label="GEO"
+                        engine={audit.technical_seo?.geo}
+                      />
+                    </div>
+
+                    <p className="text-muted-foreground text-sm mt-4">
+                      {formatLocalTimestamp(
+                        audit.created_at
+                      )}
+                    </p>
+
+                    {audit.ai_insights ? (
+
+                      <div className="mt-6 rounded-xl border border-border bg-background p-4 space-y-4">
+
+                        <div>
+
+                          <h3 className="text-sm font-semibold text-foreground">
+                            AI Executive Summary
+                          </h3>
+
+                          <p className="text-sm text-muted-foreground mt-2">
+                            {
+                              audit.ai_insights
+                                .executiveSummary
+                            }
+                          </p>
+
+                        </div>
+
+                        <div>
+
+                          <h4 className="text-sm font-medium text-foreground">
+                            Weekly Focus
+                          </h4>
+
+                          <p className="text-sm text-muted-foreground mt-2">
+                            {
+                              audit.ai_insights
+                                .weeklyFocus
+                            }
+                          </p>
+
+                        </div>
+
+                        {Array.isArray(
+                          audit.ai_insights
+                            .priorityActions
+                        ) &&
+                          audit.ai_insights
+                            .priorityActions.length >
+                            0 && (
+
+                          <div>
+
+                            <h4 className="text-sm font-medium text-foreground mb-2">
+                              Top Priorities
+                            </h4>
+
+                            <ul className="space-y-2 text-sm text-foreground">
+
+                              {audit.ai_insights.priorityActions
+                                .slice(0, 3)
+                                .map(
+                                  (
+                                    action,
+                                    index
+                                  ) => (
+
+                                    <li key={index}>
+                                      {action.title}
+                                    </li>
+
+                                  )
+                                )}
+
+                            </ul>
+
+                          </div>
+
+                        )}
+
+                      </div>
+
+                    ) : (
+
+                      <p className="mt-6 text-sm text-muted-foreground">
+                        AI insights not available for this audit.
+                      </p>
 
                     )}
 
                   </div>
 
-                ) : (
-
-                  <p className="mt-6 text-sm text-muted-foreground">
-                    AI insights not available for this audit.
-                  </p>
-
-                )}
+                ))}
 
               </div>
 
-            ))}
+              </>
 
-          </div>
+            )}
 
-          </>
+          </TabsContent>
 
-        )}
+        </Tabs>
 
       </div>
 
