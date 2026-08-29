@@ -12,6 +12,7 @@ import {
   SelectItem
 } from "@/components/ui/select"
 import ContentItemDialog from "@/components/ContentItemDialog"
+import NewContentItemDialog from "@/components/NewContentItemDialog"
 import ContentItemCard from "@/components/ContentItemCard"
 import ContentBoard from "@/components/ContentBoard"
 import {
@@ -53,6 +54,9 @@ export default function ContentStudioClient() {
     useState<ContentItem | null>(null)
 
   const [dialogOpen, setDialogOpen] =
+    useState(false)
+
+  const [newItemDialogOpen, setNewItemDialogOpen] =
     useState(false)
 
   async function loadItems() {
@@ -270,6 +274,10 @@ export default function ContentStudioClient() {
     setDialogOpen(true)
   }
 
+  function handleItemCreated(item: ContentItem) {
+    setItems((prev) => [item, ...prev])
+  }
+
   return (
 
     <main className="min-h-screen bg-background text-foreground">
@@ -299,6 +307,12 @@ export default function ContentStudioClient() {
               onClick={() => setViewMode("board")}
             >
               Board
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => setNewItemDialogOpen(true)}
+            >
+              New content idea
             </Button>
           </div>
 
@@ -373,7 +387,7 @@ export default function ContentStudioClient() {
 
           <div className="mt-10 rounded-2xl border border-border bg-card p-8 text-center text-muted-foreground">
             {items.length === 0
-              ? "No saved content yet — save ideas from an audit's AI Marketing Copilot tabs to see them here."
+              ? "No saved content yet — save ideas from an audit's AI Marketing Copilot tabs, or create one from scratch."
               : "No content items match your filters."}
           </div>
 
@@ -454,6 +468,12 @@ export default function ContentStudioClient() {
         onOpenChange={setDialogOpen}
         onUpdated={handleItemUpdated}
         onDeleted={handleItemDeleted}
+      />
+
+      <NewContentItemDialog
+        open={newItemDialogOpen}
+        onOpenChange={setNewItemDialogOpen}
+        onCreated={handleItemCreated}
       />
 
     </main>
