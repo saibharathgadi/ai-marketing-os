@@ -4,6 +4,13 @@ import { useEffect, useMemo, useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectValue,
+  SelectTrigger,
+  SelectContent,
+  SelectItem
+} from "@/components/ui/select"
 import ContentItemDialog from "@/components/ContentItemDialog"
 import ContentItemCard from "@/components/ContentItemCard"
 import ContentBoard from "@/components/ContentBoard"
@@ -308,28 +315,24 @@ export default function ContentStudioClient() {
               className="md:max-w-xs"
             />
 
-            <div className="flex flex-wrap gap-2">
-
-              <Button
-                variant={typeFilter === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setTypeFilter("all")}
-              >
-                All types
-              </Button>
-
-              {CONTENT_ITEM_TYPES.map((type) => (
-                <Button
-                  key={type}
-                  variant={typeFilter === type ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setTypeFilter(type)}
-                >
-                  {contentItemTypeLabels[type]}
-                </Button>
-              ))}
-
-            </div>
+            <Select
+              value={typeFilter}
+              onValueChange={(value) =>
+                setTypeFilter(value as ContentItemType | "all")
+              }
+            >
+              <SelectTrigger className="md:w-56">
+                <SelectValue placeholder="All types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All types</SelectItem>
+                {CONTENT_ITEM_TYPES.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {contentItemTypeLabels[type]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
           </div>
 

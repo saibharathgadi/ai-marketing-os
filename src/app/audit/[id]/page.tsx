@@ -12,6 +12,7 @@ import AuditCopilotTabs, {
 } from "@/components/AuditCopilotTabs"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import StatCard from "@/components/StatCard"
 
 export const metadata: Metadata = {
   robots: {
@@ -41,26 +42,6 @@ type AuditRow = {
   created_at: string
   technical_seo?: TechnicalSeo
   ai_insights?: Record<string, unknown> | null
-}
-
-function HealthScoreCard({
-  label,
-  engine
-}: {
-  label: string
-  engine?: EngineScore
-}) {
-  return (
-    <Card className="rounded-2xl border border-border bg-card p-6">
-      <p className="text-muted-foreground text-sm">{label}</p>
-      <h2 className="text-4xl font-bold mt-3 bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">
-        {typeof engine?.score === "number" ? engine.score : "—"}
-      </h2>
-      {!engine && (
-        <p className="text-xs text-muted-foreground mt-2">Not yet analyzed</p>
-      )}
-    </Card>
-  )
 }
 
 type CrawledPageRow = {
@@ -354,70 +335,52 @@ export default async function AuditDetailPage({
 
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-10">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mt-10">
 
-          <HealthScoreCard
+          <StatCard
             label="SEO"
-            engine={{
-              score: currentAudit?.average_score ?? 0,
-              issues: []
-            }}
+            value={currentAudit?.average_score ?? "—"}
           />
 
-          <HealthScoreCard
+          <StatCard
             label="AEO"
-            engine={currentAudit?.technical_seo?.aeo}
+            value={
+              typeof currentAudit?.technical_seo?.aeo?.score === "number"
+                ? currentAudit.technical_seo.aeo.score
+                : "—"
+            }
+            subtext={!currentAudit?.technical_seo?.aeo ? "Not yet analyzed" : undefined}
           />
 
-          <HealthScoreCard
+          <StatCard
             label="AIO"
-            engine={currentAudit?.technical_seo?.aio}
+            value={
+              typeof currentAudit?.technical_seo?.aio?.score === "number"
+                ? currentAudit.technical_seo.aio.score
+                : "—"
+            }
+            subtext={!currentAudit?.technical_seo?.aio ? "Not yet analyzed" : undefined}
           />
 
-          <HealthScoreCard
+          <StatCard
             label="GEO"
-            engine={currentAudit?.technical_seo?.geo}
+            value={
+              typeof currentAudit?.technical_seo?.geo?.score === "number"
+                ? currentAudit.technical_seo.geo.score
+                : "—"
+            }
+            subtext={!currentAudit?.technical_seo?.geo ? "Not yet analyzed" : undefined}
           />
 
-        </div>
+          <StatCard
+            label="Pages Crawled"
+            value={currentAudit?.total_pages ?? "—"}
+          />
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-
-          <div className="rounded-2xl border border-border bg-card p-6">
-
-            <p className="text-muted-foreground text-sm">
-              Average SEO Score
-            </p>
-
-            <h2 className="text-5xl font-bold mt-3">
-              {currentAudit?.average_score}
-            </h2>
-
-          </div>
-
-          <div className="rounded-2xl border border-border bg-card p-6">
-
-            <p className="text-muted-foreground text-sm">
-              Pages Crawled
-            </p>
-
-            <h2 className="text-5xl font-bold mt-3">
-              {currentAudit?.total_pages}
-            </h2>
-
-          </div>
-
-          <div className="rounded-2xl border border-border bg-card p-6">
-
-            <p className="text-muted-foreground text-sm">
-              Total Issues
-            </p>
-
-            <h2 className="text-5xl font-bold mt-3">
-              {currentAudit?.total_issues}
-            </h2>
-
-          </div>
+          <StatCard
+            label="Total Issues"
+            value={currentAudit?.total_issues ?? "—"}
+          />
 
         </div>
 
@@ -641,33 +604,37 @@ export default async function AuditDetailPage({
 
                   </div>
 
-                  <div>
+                  {page.h2s && page.h2s.length > 0 && (
 
-                    <p className="text-sm text-muted-foreground mb-2">
-                      H2 Headings
-                    </p>
+                    <div>
 
-                    <div className="space-y-2">
+                      <p className="text-sm text-muted-foreground mb-2">
+                        H2 Headings
+                      </p>
 
-                      {page.h2s?.map(
-                        (
-                          heading: string,
-                          index: number
-                        ) => (
+                      <div className="space-y-2">
 
-                          <div
-                            key={index}
-                            className="rounded-xl bg-background p-3"
-                          >
-                            {heading}
-                          </div>
+                        {page.h2s.map(
+                          (
+                            heading: string,
+                            index: number
+                          ) => (
 
-                        )
-                      )}
+                            <div
+                              key={index}
+                              className="rounded-xl bg-background p-3"
+                            >
+                              {heading}
+                            </div>
+
+                          )
+                        )}
+
+                      </div>
 
                     </div>
 
-                  </div>
+                  )}
 
                 </div>
 
@@ -711,17 +678,21 @@ export default async function AuditDetailPage({
 
                   </div>
 
-                  <div>
+                  {page.ai_recommendations && (
 
-                    <p className="text-sm text-muted-foreground mb-2">
-                      AI Recommendations
-                    </p>
+                    <div>
 
-                    <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 p-4 whitespace-pre-wrap text-blue-700 dark:text-blue-300">
-                      {page.ai_recommendations}
+                      <p className="text-sm text-muted-foreground mb-2">
+                        AI Recommendations
+                      </p>
+
+                      <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 p-4 whitespace-pre-wrap text-blue-700 dark:text-blue-300">
+                        {page.ai_recommendations}
+                      </div>
+
                     </div>
 
-                  </div>
+                  )}
 
                   <div>
 
