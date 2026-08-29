@@ -684,7 +684,7 @@ export async function crawlWebsite(
 
   const startedAt = Date.now()
   const urlValidation =
-    validateWebsiteUrl(url)
+    await validateWebsiteUrl(url)
   const getDurationMs = () =>
     Date.now() - startedAt
 

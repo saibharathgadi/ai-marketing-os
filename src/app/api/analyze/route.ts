@@ -109,7 +109,7 @@ export async function POST(
         : undefined
 
     const urlValidation =
-      validateWebsiteUrl(
+      await validateWebsiteUrl(
         (body as {
           url?: unknown
         }).url

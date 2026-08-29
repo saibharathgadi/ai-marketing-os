@@ -212,7 +212,7 @@ export async function POST(
   }
 
   const urlValidation =
-    validateWebsiteUrl(
+    await validateWebsiteUrl(
       (body as { url?: unknown }).url
     )
 

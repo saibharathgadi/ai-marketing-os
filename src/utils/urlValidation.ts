@@ -1,3 +1,5 @@
+import dns from "node:dns/promises"
+
 type WebsiteUrlValidationResult =
   | {
       success: true
@@ -175,9 +177,41 @@ function isPrivateIpv6(hostname: string) {
   )
 }
 
-export function validateWebsiteUrl(
+/**
+ * Resolves a hostname to its actual A/AAAA records and checks each one
+ * against the same private/loopback/link-local rules used for literal
+ * IP hostnames. Hostname-string validation alone would let through a
+ * domain that simply *resolves* to a private address or the cloud
+ * metadata endpoint (169.254.169.254) — this closes that gap. It does
+ * not defend against an attacker's DNS server returning a different,
+ * malicious answer on a second lookup after this check passes (true
+ * DNS-rebinding); doing that requires pinning the fetch to the
+ * resolved IP, which is a further hardening step beyond this fix.
+ */
+async function hasOnlySafeResolvedAddresses(
+  hostname: string
+): Promise<boolean> {
+  let addresses: { address: string }[]
+
+  try {
+    addresses = await dns.lookup(hostname, { all: true })
+  } catch {
+    // Unresolvable hostname (NXDOMAIN, etc.) — fail closed, the caller
+    // treats this the same as any other validation failure.
+    return false
+  }
+
+  return addresses.every(
+    ({ address }) =>
+      !blockedHostnames.has(address) &&
+      !isPrivateIpv4(address) &&
+      !isPrivateIpv6(address)
+  )
+}
+
+export async function validateWebsiteUrl(
   value: unknown
-): WebsiteUrlValidationResult {
+): Promise<WebsiteUrlValidationResult> {
   if (typeof value !== "string") {
     return {
       success: false,
@@ -250,6 +284,17 @@ export function validateWebsiteUrl(
     }
   }
 
+  // The hostname itself isn't a blocked literal, but it might still
+  // *resolve* to a private IP or the cloud metadata address — resolve
+  // it and re-check before allowing the crawl to proceed.
+  if (!(await hasOnlySafeResolvedAddresses(hostname))) {
+    return {
+      success: false,
+      error:
+        "Private, local, and loopback addresses cannot be audited."
+    }
+  }
+
   parsed.hash = ""
 
   return {
@@ -281,7 +326,7 @@ export async function fetchWithSsrfProtection(
     redirectCount++
   ) {
     const validation =
-      validateWebsiteUrl(currentUrl)
+      await validateWebsiteUrl(currentUrl)
 
     if (!validation.success) {
       throw new UnsafeRedirectError(

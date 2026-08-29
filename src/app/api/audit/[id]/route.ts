@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import {
+  checkRateLimit,
+  getRequestKey
+} from "@/utils/rateLimit"
 
 export async function DELETE(
   request: Request,
@@ -7,6 +11,37 @@ export async function DELETE(
     params: Promise<{ id: string }>
   }
 ) {
+
+  const rateLimit =
+    await checkRateLimit({
+      key: getRequestKey(
+        request,
+        "audit-delete"
+      ),
+      limit: 20,
+      windowMs: 60_000
+    })
+
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "Too many requests. Please try again shortly.",
+        retryAfterSeconds:
+          rateLimit.retryAfterSeconds
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After":
+            String(
+              rateLimit.retryAfterSeconds
+            )
+        }
+      }
+    )
+  }
 
   const { id } =
     await context.params

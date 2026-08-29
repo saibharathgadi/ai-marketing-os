@@ -145,7 +145,7 @@ export async function enqueueAudit(
 ): Promise<QueuedAuditResult> {
 
   const urlValidation =
-    validateWebsiteUrl(url)
+    await validateWebsiteUrl(url)
 
   if (!urlValidation.success) {
     return {
