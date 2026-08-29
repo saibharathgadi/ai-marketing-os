@@ -384,6 +384,67 @@ export default async function AuditDetailPage({
 
         </div>
 
+        {(currentAudit?.technical_seo?.aeo?.issues?.length ||
+          currentAudit?.technical_seo?.aio?.issues?.length ||
+          currentAudit?.technical_seo?.geo?.issues?.length) ? (
+
+          <section className="mt-10 rounded-2xl border border-border bg-card p-6">
+
+            <h2 className="text-lg font-semibold">
+              Evidence behind your AEO / AIO / GEO scores
+            </h2>
+
+            <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
+              The specific, measured findings the crawl found on your
+              homepage — not an estimate or a recommendation, just what&apos;s
+              actually there.
+            </p>
+
+            <div className="grid gap-6 md:grid-cols-3 mt-6">
+
+              {(
+                [
+                  { key: "aeo", label: "AEO", engine: currentAudit?.technical_seo?.aeo },
+                  { key: "aio", label: "AIO", engine: currentAudit?.technical_seo?.aio },
+                  { key: "geo", label: "GEO", engine: currentAudit?.technical_seo?.geo }
+                ] as const
+              ).map(({ key, label, engine }) =>
+
+                engine?.issues?.length ? (
+
+                  <div
+                    key={key}
+                    className="rounded-xl border border-border/60 p-4"
+                  >
+
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold">{label}</h3>
+                      <span className="text-xs text-muted-foreground">
+                        {engine.score} / 100
+                      </span>
+                    </div>
+
+                    <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                      {engine.issues.map((issue, index) => (
+                        <li key={index} className="flex gap-2">
+                          <span className="text-orange-500">•</span>
+                          <span>{issue}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                  </div>
+
+                ) : null
+
+              )}
+
+            </div>
+
+          </section>
+
+        ) : null}
+
         {isTeaserAudit && (
 
           <Card className="mt-10 rounded-2xl border border-violet-500/20 bg-violet-500/10 p-8 text-center">

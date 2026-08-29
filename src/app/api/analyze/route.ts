@@ -8,7 +8,8 @@ import {
 import { updateMonitoredWebsiteDiagnostics } from "@/utils/monitoredWebsiteDiagnostics"
 import { validateWebsiteUrl } from "@/utils/urlValidation"
 import { createClient } from "@/lib/supabase/server"
-import { getCurrentOrgId } from "@/utils/organizations"
+import { getCurrentOrgId, getOrgPlanAndName } from "@/utils/organizations"
+import { checkInternalUsageAndAlert } from "@/utils/internalUsageMonitor"
 
 // A full site crawl (sitemap discovery + multi-level link following) can
 // legitimately take longer than the platform default; this opts into
@@ -109,7 +110,7 @@ export async function POST(
         : undefined
 
     const urlValidation =
-      validateWebsiteUrl(
+      await validateWebsiteUrl(
         (body as {
           url?: unknown
         }).url
@@ -224,13 +225,27 @@ export async function POST(
     // fast and free of AI-provider cost; the audit page already
     // hides the AI Copilot tabs when ai_insights is null.
 
-    const aiInsights =
-      isAnonymous
-        ? null
-        : await generateAndPersistAuditInsights({
-            ...auditData,
-            orgId
-          })
+    let aiInsights = null
+
+    if (!isAnonymous && orgId) {
+
+      const { plan, name } =
+        await getOrgPlanAndName(supabase, orgId)
+
+      await checkInternalUsageAndAlert({
+        plan,
+        orgId,
+        orgName: name,
+        resource: "ai-calls"
+      })
+
+      aiInsights =
+        await generateAndPersistAuditInsights({
+          ...auditData,
+          orgId
+        })
+
+    }
 
     // ======================================================
     // FINAL RESPONSE

@@ -13,6 +13,7 @@ import {
   DropdownMenuItem
 } from "@/components/ui/dropdown-menu"
 import { ThemeToggle } from "@/components/ThemeToggle"
+import WorkspaceSwitcher from "@/components/WorkspaceSwitcher"
 import { cn } from "@/lib/utils"
 import { ChevronDownIcon, MenuIcon, XIcon } from "lucide-react"
 
@@ -31,6 +32,7 @@ const navLinks = [
 // 9 items with no hierarchy.
 const settingsLinks = [
   { href: "/settings/brand", label: "Brand" },
+  { href: "/settings/integrations", label: "Integrations" },
   { href: "/settings/team", label: "Team" },
   { href: "/settings/billing", label: "Billing" }
 ]
@@ -99,6 +101,8 @@ export default function Navbar() {
         >
           Verolyx
         </Link>
+
+        {user && <WorkspaceSwitcher />}
 
         {user ? (
 

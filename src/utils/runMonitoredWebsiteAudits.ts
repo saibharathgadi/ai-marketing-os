@@ -5,6 +5,8 @@ import { generateAndPersistAuditInsights } from "./aiCopilot"
 import { analyzeSeoRegression } from "./seoRegression"
 import { sendSeoRegressionAlertEmail } from "./emailReport"
 import { isMissingColumnError } from "./schemaCompat"
+import { getOrgPlanAndName } from "./organizations"
+import { checkInternalUsageAndAlert } from "./internalUsageMonitor"
 
 type MonitoredWebsiteRow = {
   id: string
@@ -220,6 +222,17 @@ export async function runMonitoredWebsiteAudits(
         )
 
       if (auditResult.success) {
+
+        const { plan, name } =
+          await getOrgPlanAndName(supabase, website.org_id)
+
+        await checkInternalUsageAndAlert({
+          plan,
+          orgId: website.org_id,
+          orgName: name,
+          resource: "ai-calls"
+        })
+
         await generateAndPersistAuditInsights({
           ...auditResult.data,
           orgId: website.org_id
