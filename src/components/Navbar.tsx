@@ -31,6 +31,7 @@ const navLinks = [
 // 9 items with no hierarchy.
 const settingsLinks = [
   { href: "/settings/brand", label: "Brand" },
+  { href: "/settings/integrations", label: "Integrations" },
   { href: "/settings/team", label: "Team" },
   { href: "/settings/billing", label: "Billing" }
 ]
