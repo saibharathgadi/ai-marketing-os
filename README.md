@@ -40,14 +40,18 @@ Open [http://localhost:3000](http://localhost:3000).
 | `RESEND_FROM_EMAIL` | No | Defaults to a Resend sandbox address |
 | `CRON_SECRET` | Recommended in production | Protects `GET /api/run-scheduled-audits` from unauthenticated calls |
 | `CRAWL_MAX_PAGES`, `CRAWL_PAGE_CONCURRENCY`, `CRAWL_SLOW_MS`, `CRAWL_QUEUE_CONCURRENCY`, `CRAWL_QUEUE_MAX_SIZE` | No | Tune crawl/queue behavior; all have sane defaults |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Server-only — background jobs, OAuth token storage, rate limiting |
+| `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` | No | Enables the Google Search Console / GA4 integrations under Settings → Integrations |
+| `INTEGRATION_TOKEN_ENCRYPTION_KEY` | Required if the Google integrations are enabled | AES-256-GCM key OAuth refresh/access tokens are encrypted with at rest |
+| `ADMIN_ALERT_EMAIL` | No | Where integration-failure and internal-usage-spike alert emails are sent (requires `RESEND_API_KEY`) |
+| `MULTI_ORG_GATE_ORG_IDS` | No | Comma-separated org ids with multi-org (workspace switcher) support enabled during rollout — see `src/utils/organizations.ts` |
 
 ### Database schema
 
-There's no migration tooling yet — run
-[`database-index-recommendations.sql`](./database-index-recommendations.sql)
-in the Supabase SQL editor to add the optional diagnostic/notification
-columns and recommended indexes. The app degrades gracefully if a column
-from that file hasn't been applied yet (see `src/utils/schemaCompat.ts`).
+Migrations live in [`supabase/migrations`](./supabase/migrations) and
+are applied by hand via the Supabase SQL editor (or the Supabase CLI, if
+installed) — there's no automated migration-apply step in the deploy
+pipeline yet. Apply them in filename order.
 
 ## Scripts
 
@@ -57,6 +61,7 @@ npm run build        # production build
 npm run start        # run a production build
 npm run lint          # ESLint
 npm run typecheck      # tsc --noEmit
+npm run test           # vitest — runs against the real Supabase project (see vitest.config.ts)
 ```
 
 ## Known limitations
