@@ -1,7 +1,9 @@
 "use client"
 
 import { useState } from "react"
+import { Bookmark, BookmarkCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useToast } from "@/components/ToastProvider"
 
 export default function SaveCampaignButton({
   auditId,
@@ -25,6 +27,8 @@ export default function SaveCampaignButton({
 
   const [state, setState] =
     useState<"idle" | "saving" | "saved" | "error">("idle")
+
+  const { toast } = useToast()
 
   async function handleSave() {
 
@@ -54,6 +58,12 @@ export default function SaveCampaignButton({
       if (result.success) {
         setState("saved")
         onSaved(result.data.id)
+        toast({
+          title: "Campaign saved",
+          description: name,
+          actionLabel: "View in Campaign Builder",
+          actionHref: "/campaigns"
+        })
       } else {
         setState("error")
       }
@@ -71,7 +81,7 @@ export default function SaveCampaignButton({
 
     <Button
       type="button"
-      variant="outline"
+      variant="default"
       size="xs"
       onClick={(e) => {
         e.stopPropagation()
@@ -79,8 +89,13 @@ export default function SaveCampaignButton({
       }}
       disabled={state === "saving" || state === "saved"}
     >
+      {state === "saved" ? (
+        <BookmarkCheck />
+      ) : (
+        <Bookmark />
+      )}
       {state === "saved"
-        ? "Saved ✓"
+        ? "Saved"
         : state === "saving"
           ? "Saving…"
           : state === "error"

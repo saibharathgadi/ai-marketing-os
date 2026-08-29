@@ -1,7 +1,9 @@
 "use client"
 
 import { useState } from "react"
+import { Bookmark, BookmarkCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useToast } from "@/components/ToastProvider"
 import type { ContentItemType } from "@/utils/contentItems"
 
 export default function SaveToContentStudioButton({
@@ -9,17 +11,21 @@ export default function SaveToContentStudioButton({
   siteUrl,
   type,
   title,
-  body
+  body,
+  variant = "outline"
 }: {
   auditId: string
   siteUrl: string
   type: ContentItemType
   title: string
   body: Record<string, unknown>
+  variant?: "outline" | "ghost"
 }) {
 
   const [state, setState] =
     useState<"idle" | "saving" | "saved" | "error">("idle")
+
+  const { toast } = useToast()
 
   async function handleSave() {
 
@@ -46,6 +52,15 @@ export default function SaveToContentStudioButton({
 
       setState(result.success ? "saved" : "error")
 
+      if (result.success) {
+        toast({
+          title: "Saved to Content Studio",
+          description: title,
+          actionLabel: "View in Content Studio",
+          actionHref: "/content"
+        })
+      }
+
     } catch (error) {
 
       console.error(error)
@@ -59,7 +74,7 @@ export default function SaveToContentStudioButton({
 
     <Button
       type="button"
-      variant="outline"
+      variant={variant}
       size="xs"
       onClick={(e) => {
         e.stopPropagation()
@@ -67,8 +82,13 @@ export default function SaveToContentStudioButton({
       }}
       disabled={state === "saving" || state === "saved"}
     >
+      {state === "saved" ? (
+        <BookmarkCheck />
+      ) : (
+        <Bookmark />
+      )}
       {state === "saved"
-        ? "Saved ✓"
+        ? "Saved"
         : state === "saving"
           ? "Saving…"
           : state === "error"
