@@ -25,6 +25,20 @@ import { createServiceClient } from "@/lib/supabase/service"
  * the function deliberately falls back to the pre-Phase-1 behavior (see
  * the comment in src/utils/organizations.ts). Mocking it is what lets
  * the workspace-switcher cookie path be exercised at all here.
+ *
+ * Every new auth user automatically gets a default organization + owner
+ * membership via the `handle_new_user` trigger (see
+ * supabase/migrations/20260726151448_multi_tenant.sql) — so "a single-
+ * org user" and "a user with no orgs yet" both already have that one
+ * auto-created org the moment they're created. The fixtures below work
+ * with that instead of fighting it: user B's "single org" IS its
+ * auto-created org (never a second, manually-added one), and user C's
+ * invite-acceptance case starts from their auto-created org and adds a
+ * second, matching the real flow (a user always already has their own
+ * default workspace before ever accepting a team invite). `afterAll`
+ * discovers every org any test user actually ended up in — rather than
+ * only the ones this file explicitly created — specifically so an
+ * auto-created org can never be missed and leaked into production.
  */
 
 const runId = randomUUID().slice(0, 8)
@@ -78,7 +92,9 @@ describe("Phase 1 org isolation", () => {
 
   let orgGatedA: string
   let orgGatedB: string
-  let orgUngated: string
+
+  // User B's own auto-created default org — the "single org" in test 4.
+  let orgAutoB: string
 
   let userA: string
   let userB: string
@@ -86,19 +102,17 @@ describe("Phase 1 org isolation", () => {
 
   beforeAll(async () => {
 
-    const [orgAResult, orgBResult, orgCResult] = await Promise.all([
+    const [orgAResult, orgBResult] = await Promise.all([
       service.from("organizations").insert({ name: orgName("gated_a") }).select("id").single(),
-      service.from("organizations").insert({ name: orgName("gated_b") }).select("id").single(),
-      service.from("organizations").insert({ name: orgName("ungated") }).select("id").single()
+      service.from("organizations").insert({ name: orgName("gated_b") }).select("id").single()
     ])
 
-    if (orgAResult.error || orgBResult.error || orgCResult.error) {
-      throw orgAResult.error || orgBResult.error || orgCResult.error
+    if (orgAResult.error || orgBResult.error) {
+      throw orgAResult.error || orgBResult.error
     }
 
     orgGatedA = orgAResult.data.id
     orgGatedB = orgBResult.data.id
-    orgUngated = orgCResult.data.id
 
     // The gate constant is read from process.env once, at module import
     // time — set it and force a fresh import so this run's real org ids
@@ -132,16 +146,29 @@ describe("Phase 1 org isolation", () => {
     userB = userBResult.data.user.id
     userC = userCResult.data.user.id
 
-    // User A is a member of both gated orgs (the "one login, two
-    // workspaces" case). User B belongs only to the ungated org — the
-    // vast majority of real users, unaffected by any of this. User C
-    // starts with no membership at all, for the invite-acceptance case.
+    const autoMembershipB =
+      await service
+        .from("organization_members")
+        .select("org_id")
+        .eq("user_id", userB)
+        .single()
+
+    if (autoMembershipB.error) {
+      throw autoMembershipB.error
+    }
+
+    orgAutoB = autoMembershipB.data.org_id
+
+    // User A additionally joins both gated orgs (the "one login, two
+    // workspaces" case), on top of their own auto-created default org.
+    // User B and C are untouched here — B's single org is its
+    // auto-created one, and C stays at just its auto-created org until
+    // test 5 adds a second via a real invite.
     const membershipInserts = await service
       .from("organization_members")
       .insert([
         { org_id: orgGatedA, user_id: userA, role: "owner", email: testEmail("a") },
-        { org_id: orgGatedB, user_id: userA, role: "owner", email: testEmail("a") },
-        { org_id: orgUngated, user_id: userB, role: "owner", email: testEmail("b") }
+        { org_id: orgGatedB, user_id: userA, role: "owner", email: testEmail("a") }
       ])
 
     if (membershipInserts.error) {
@@ -163,15 +190,40 @@ describe("Phase 1 org isolation", () => {
 
   afterAll(async () => {
 
-    await service.from("competitors").delete().in("org_id", [orgGatedA, orgGatedB, orgUngated])
-    await service.from("organization_invites").delete().in("org_id", [orgGatedA, orgGatedB, orgUngated])
-    await service.from("organization_members").delete().in("org_id", [orgGatedA, orgGatedB, orgUngated])
-    await service.from("organizations").delete().in("id", [orgGatedA, orgGatedB, orgUngated])
+    // Don't rely on which orgs this file explicitly created — a user's
+    // auto-created default org is a side effect of `admin.createUser`,
+    // not something inserted here, so it has to be discovered rather
+    // than assumed. Querying every org any test user actually belongs
+    // to is what caught (and now prevents) the very leak this comment
+    // is here to explain: three earlier runs of this suite each left
+    // 3 auto-created orgs behind in production because cleanup only
+    // ever knew about the orgs it had inserted itself.
+    const testUserIds = [userA, userB, userC].filter(Boolean)
 
-    for (const userId of [userA, userB, userC]) {
-      if (userId) {
-        await service.auth.admin.deleteUser(userId)
-      }
+    const { data: allMemberships } =
+      testUserIds.length > 0
+        ? await service
+            .from("organization_members")
+            .select("org_id")
+            .in("user_id", testUserIds)
+        : { data: [] as { org_id: string }[] }
+
+    const allOrgIds = Array.from(
+      new Set(
+        [orgGatedA, orgGatedB, ...(allMemberships ?? []).map((m) => m.org_id)]
+          .filter(Boolean)
+      )
+    )
+
+    if (allOrgIds.length > 0) {
+      await service.from("competitors").delete().in("org_id", allOrgIds)
+      await service.from("organization_invites").delete().in("org_id", allOrgIds)
+      await service.from("organization_members").delete().in("org_id", allOrgIds)
+      await service.from("organizations").delete().in("id", allOrgIds)
+    }
+
+    for (const userId of testUserIds) {
+      await service.auth.admin.deleteUser(userId)
     }
 
   })
@@ -217,7 +269,7 @@ describe("Phase 1 org isolation", () => {
     try {
 
       const memberships = await getUserOrganizations(clientA)
-      const isMember = memberships.some((m) => m.orgId === orgUngated)
+      const isMember = memberships.some((m) => m.orgId === orgAutoB)
 
       // This mirrors the exact check /api/workspace/active/route.ts
       // performs before ever looking at the gate — a client-supplied
@@ -268,11 +320,12 @@ describe("Phase 1 org isolation", () => {
 
       // No cookie set at all — the exact pre-Phase-1 call shape. A
       // single-membership, non-gated user must resolve straight to
-      // their one org with no dependency on the cookie path.
+      // their one (auto-created) org with no dependency on the cookie
+      // path.
       activeOrgCookieValue = undefined
 
       const resolvedOrgId = await getCurrentOrgId(clientB)
-      expect(resolvedOrgId).toBe(orgUngated)
+      expect(resolvedOrgId).toBe(orgAutoB)
 
     } finally {
 
@@ -322,8 +375,9 @@ describe("Phase 1 org isolation", () => {
     // The route only ever inserts a membership once a real pending
     // invite for the signed-in user's own email is found — replicate
     // that exact sequence, then confirm the new member can see their
-    // own membership through their own RLS-scoped session (not just
-    // that the service-role insert succeeded).
+    // own new membership (alongside their pre-existing auto-created
+    // org) through their own RLS-scoped session, not just that the
+    // service-role insert succeeded.
     const membershipInsert =
       await service
         .from("organization_members")
@@ -340,15 +394,17 @@ describe("Phase 1 org isolation", () => {
 
     try {
 
-      const { data: ownMembership, error } =
+      const { data: ownMemberships, error } =
         await clientC
           .from("organization_members")
           .select("org_id")
           .eq("user_id", userC)
 
       expect(error).toBeNull()
-      expect(ownMembership).toHaveLength(1)
-      expect(ownMembership![0].org_id).toBe(orgGatedA)
+
+      const orgIds = (ownMemberships ?? []).map((m) => m.org_id)
+      expect(orgIds).toContain(orgGatedA)
+      expect(orgIds).toHaveLength(2)
 
     } finally {
 
