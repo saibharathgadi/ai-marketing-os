@@ -78,6 +78,13 @@ export default function WorkspaceSwitcher() {
         return
       }
 
+      // router.refresh() re-fetches server-rendered page content for the
+      // new active org, but this component's own state was only ever
+      // fetched once on mount — without this, the dropdown itself kept
+      // showing the previous org's name until a full page reload
+      // remounted it, even though the underlying data had switched.
+      setActiveOrgId(orgId)
+
       router.push("/dashboard")
       router.refresh()
 
