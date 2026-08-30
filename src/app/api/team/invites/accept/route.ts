@@ -18,6 +18,54 @@ import {
  * email — there is no path here that lets a user add themselves to an
  * organization without one.
  */
+
+/**
+ * Read-only lookup for PendingInviteBanner — same matching rule as
+ * POST below (pending, non-expired, current user's own email), just
+ * without accepting anything. Lets the dashboard show "you've been
+ * invited to X" before the user commits to joining.
+ */
+export async function GET() {
+
+  const supabase = await createClient()
+
+  const {
+    data: { user }
+  } = await supabase.auth.getUser()
+
+  if (!user || !user.email) {
+    return NextResponse.json({ success: true, data: null })
+  }
+
+  const serviceClient = createServiceClient()
+
+  const { data: invite } =
+    await serviceClient
+      .from("organization_invites")
+      .select("id, organizations(name)")
+      .eq("status", "pending")
+      .ilike("email", user.email)
+      .gt("expires_at", new Date().toISOString())
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+  if (!invite) {
+    return NextResponse.json({ success: true, data: null })
+  }
+
+  const org = invite.organizations as unknown as { name: string } | null
+
+  return NextResponse.json({
+    success: true,
+    data: {
+      inviteId: invite.id,
+      orgName: org?.name ?? "a workspace"
+    }
+  })
+
+}
+
 export async function POST(request: Request) {
 
   const rateLimit =

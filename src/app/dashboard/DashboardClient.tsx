@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client"
 import { formatLocalTimestamp } from "@/lib/date"
 import DashboardCharts from "@/components/DashboardCharts"
 import MonitoredWebsites from "@/components/MonitoredWebsites"
+import PendingInviteBanner from "@/components/PendingInviteBanner"
 import StatCard from "@/components/StatCard"
 import { isMissingColumnError } from "@/utils/schemaCompat"
 import { Badge } from "@/components/ui/badge"
@@ -578,6 +579,10 @@ export default function DashboardClient() {
             </Link>
           </Button>
 
+        </div>
+
+        <div className="mt-8">
+          <PendingInviteBanner />
         </div>
 
         <Tabs defaultValue="overview" className="mt-10">
