@@ -119,11 +119,26 @@ export async function POST(
       | { executiveSummary?: string; detectedThemes?: string[] }
       | null
 
+  const { data: brandProfile } =
+    await supabase
+      .from("brand_profiles")
+      .select("business_description,target_audience,tone_of_voice,key_differentiators")
+      .eq("org_id", audit.org_id)
+      .maybeSingle()
+
   const result =
     await generateFaqSuggestions({
       siteUrl: audit.url,
       executiveSummary: aiInsights?.executiveSummary,
-      detectedThemes: aiInsights?.detectedThemes
+      detectedThemes: aiInsights?.detectedThemes,
+      brandProfile: brandProfile
+        ? {
+            businessDescription: brandProfile.business_description,
+            targetAudience: brandProfile.target_audience,
+            toneOfVoice: brandProfile.tone_of_voice,
+            keyDifferentiators: brandProfile.key_differentiators
+          }
+        : null
     })
 
   return NextResponse.json({

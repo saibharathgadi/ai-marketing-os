@@ -1,10 +1,18 @@
 import { generateStructuredJSON, type AIProviderSource } from "./aiProvider"
 import { deriveBrandName } from "./aiCopilot"
 
+type BrandProfileContext = {
+  businessDescription: string | null
+  targetAudience: string | null
+  toneOfVoice: string | null
+  keyDifferentiators: string | null
+} | null
+
 type FaqSchemaInput = {
   siteUrl: string
   executiveSummary?: string | null
   detectedThemes?: string[]
+  brandProfile?: BrandProfileContext
 }
 
 type FaqPair = {
@@ -39,7 +47,11 @@ function buildPrompts(input: FaqSchemaInput) {
     "exactly 5 frequently-asked-question-and-answer pairs relevant to this " +
     "business, suitable for a schema.org FAQPage. Answers should be 1-3 " +
     "sentences, factual in tone, and grounded in the provided context " +
-    "rather than generic. Return JSON only, matching this exact structure: " +
+    "rather than generic. If brandProfile context is present, write " +
+    "answers in the stated tone of voice and reflecting the stated " +
+    "differentiators where relevant — treat it as the voice and " +
+    "perspective guide. If brandProfile is absent, proceed exactly as you " +
+    "would without it. Return JSON only, matching this exact structure: " +
     '{"faqs":[{"question":"...","answer":"..."},...]}'
 
   const userPrompt = [
@@ -47,6 +59,18 @@ function buildPrompts(input: FaqSchemaInput) {
     input.executiveSummary ? `Summary: ${input.executiveSummary}` : null,
     input.detectedThemes && input.detectedThemes.length > 0
       ? `Themes: ${input.detectedThemes.join(", ")}`
+      : null,
+    input.brandProfile?.businessDescription
+      ? `Business: ${input.brandProfile.businessDescription}`
+      : null,
+    input.brandProfile?.targetAudience
+      ? `Target audience: ${input.brandProfile.targetAudience}`
+      : null,
+    input.brandProfile?.toneOfVoice
+      ? `Tone of voice: ${input.brandProfile.toneOfVoice}`
+      : null,
+    input.brandProfile?.keyDifferentiators
+      ? `Key differentiators: ${input.brandProfile.keyDifferentiators}`
       : null
   ]
     .filter(Boolean)
