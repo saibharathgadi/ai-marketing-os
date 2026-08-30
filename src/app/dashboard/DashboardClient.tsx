@@ -222,10 +222,31 @@ export default function DashboardClient() {
 
     try {
 
+      // This is a browser-side Supabase query, so it can't call the
+      // server-only getCurrentOrgId() — it has to resolve the active
+      // org the same way WorkspaceSwitcher does. Without this, RLS
+      // alone let a gated multi-org user's dashboard show a union of
+      // every org's audits instead of just the active workspace's.
+      const workspaceResponse =
+        await fetch("/api/workspace")
+          .then((res) => res.json())
+          .catch(() => null)
+
+      const activeOrgId: string | null =
+        workspaceResponse?.success
+          ? workspaceResponse.data.activeOrgId
+          : null
+
+      if (!activeOrgId) {
+        setAudits([])
+        return
+      }
+
       let response =
         await supabase
           .from("audits")
           .select(auditSelect)
+          .eq("org_id", activeOrgId)
           .order("created_at", {
             ascending: false
           })
@@ -245,6 +266,7 @@ export default function DashboardClient() {
           await supabase
             .from("audits")
             .select(fallbackAuditSelect)
+            .eq("org_id", activeOrgId)
             .order("created_at", {
               ascending: false
             })
@@ -318,6 +340,17 @@ export default function DashboardClient() {
     // cascading-render risk.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadAudits()
+
+    // WorkspaceSwitcher dispatches this after a successful switch —
+    // loadAudits resolves the active org itself on every call, but
+    // this effect otherwise only ever fires once on mount, so without
+    // this listener switching workspaces left the audit list showing
+    // the previous org's data until a full page reload.
+    window.addEventListener("verolyx:workspace-switched", loadAudits)
+
+    return () => {
+      window.removeEventListener("verolyx:workspace-switched", loadAudits)
+    }
 
   }, [loadAudits])
 

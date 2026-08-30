@@ -242,6 +242,11 @@ export default async function AuditDetailPage({
           "id,url,average_score,total_pages,total_issues,created_at"
         )
         .eq("url", currentAudit.url)
+        // Without this, two orgs the same login belongs to auditing
+        // the same URL could cross-contaminate each other's trend
+        // line -- matching by URL alone isn't enough once a user can
+        // be a member of more than one org.
+        .eq("org_id", currentAudit.org_id)
         .lt(
           "created_at",
           currentAudit.created_at

@@ -93,15 +93,18 @@ export async function POST(
     )
   }
 
-  // Confirm the campaign resolves under RLS (i.e. belongs to the current
-  // user's org) before inserting — this is what keeps ad_sets.org_id
-  // (denormalized for RLS simplicity) guaranteed to match its parent
-  // campaign's org_id rather than trusting a client-supplied value.
+  // Confirm the campaign belongs to the ACTIVE org before inserting --
+  // RLS alone only proves the campaign is in SOME org this user
+  // belongs to, which for a gated multi-org user could be a different
+  // (non-active) org. Without this explicit filter, a foreign-org
+  // campaign id would resolve successfully and the new ad set would be
+  // created under that other org instead of the active one.
   const campaignResponse =
     await supabase
       .from("campaigns")
       .select("id, org_id")
       .eq("id", input.campaignId)
+      .eq("org_id", orgId)
       .single()
 
   if (campaignResponse.error || !campaignResponse.data) {
