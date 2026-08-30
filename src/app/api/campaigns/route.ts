@@ -9,14 +9,31 @@ import {
 export async function GET() {
 
   const supabase = await createClient()
+  const orgId = await getCurrentOrgId(supabase)
 
-  // No manual org_id filter needed — RLS restricts both tables to
-  // organizations the current session's user belongs to. Supabase embeds
-  // ad_sets via its campaign_id foreign key in one round trip.
+  if (!orgId) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Authentication required."
+      },
+      {
+        status: 401
+      }
+    )
+  }
+
+  // RLS alone only proves membership in SOME org the user belongs to --
+  // a gated multi-org user legitimately has RLS visibility into every
+  // org they're in, not just the active one. Without this explicit
+  // filter, a two-org user's campaign list was a union of both orgs.
+  // Supabase embeds ad_sets via its campaign_id foreign key in one
+  // round trip.
   const response =
     await supabase
       .from("campaigns")
       .select("*, ad_sets(*), landing_page_briefs(*)")
+      .eq("org_id", orgId)
       .order("created_at", {
         ascending: false
       })

@@ -120,17 +120,20 @@ export async function POST(request: Request) {
     )
   }
 
-  // Confirm the campaign resolves under RLS (i.e. belongs to the current
-  // user's org) before generating or inserting anything -- this is what
-  // keeps landing_page_briefs.org_id (denormalized for RLS simplicity)
-  // guaranteed to match its parent campaign's org_id rather than
-  // trusting a client-supplied value, and stops a stray/hostile
+  // Confirm the campaign belongs to the ACTIVE org before generating or
+  // inserting anything -- RLS alone only proves the campaign is in SOME
+  // org this user belongs to, which for a gated multi-org user could be
+  // a different (non-active) org. Without this explicit filter, a
+  // foreign-org campaignId would resolve successfully and the brief
+  // below would be generated using the ACTIVE org's brand voice but
+  // stored under the OTHER org -- and it also stops a stray/hostile
   // campaignId from spending AI-provider quota before it 404s.
   const campaignResponse =
     await supabase
       .from("campaigns")
       .select("id,org_id,name,objective,target_audience,key_message")
       .eq("id", input.campaignId)
+      .eq("org_id", orgId)
       .single()
 
   if (campaignResponse.error || !campaignResponse.data) {
@@ -149,7 +152,7 @@ export async function POST(request: Request) {
     await supabase
       .from("brand_profiles")
       .select("business_description,target_audience,tone_of_voice,key_differentiators")
-      .eq("org_id", orgId)
+      .eq("org_id", campaignResponse.data.org_id)
       .maybeSingle()
 
   const generated =

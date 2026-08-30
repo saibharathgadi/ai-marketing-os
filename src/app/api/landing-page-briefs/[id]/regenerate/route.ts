@@ -63,13 +63,18 @@ export async function POST(
     )
   }
 
-  // RLS-scoped fetch doubles as the ownership check — a miss here (wrong
-  // org, or logged out) 404s before any AI call fires.
+  // Explicit org_id filter, not just an RLS-scoped fetch -- RLS alone
+  // only proves the brief is in SOME org this user belongs to, which
+  // for a gated multi-org user could be a different (non-active) org.
+  // Without this, the brief below would be regenerated using the
+  // ACTIVE org's brand voice even if the brief itself belongs to the
+  // other org.
   const { data: brief, error: briefError } =
     await supabase
       .from("landing_page_briefs")
-      .select("id,target_offer,campaign_id")
+      .select("id,target_offer,campaign_id,org_id")
       .eq("id", id)
+      .eq("org_id", orgId)
       .single()
 
   if (briefError || !brief) {
@@ -89,6 +94,7 @@ export async function POST(
       .from("campaigns")
       .select("name,objective,target_audience,key_message")
       .eq("id", brief.campaign_id)
+      .eq("org_id", brief.org_id)
       .single()
 
   if (campaignError || !campaign) {
@@ -107,7 +113,7 @@ export async function POST(
     await supabase
       .from("brand_profiles")
       .select("business_description,target_audience,tone_of_voice,key_differentiators")
-      .eq("org_id", orgId)
+      .eq("org_id", brief.org_id)
       .maybeSingle()
 
   const generated =

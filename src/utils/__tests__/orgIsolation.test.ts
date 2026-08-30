@@ -100,6 +100,11 @@ describe("Phase 1 org isolation", () => {
   let userB: string
   let userC: string
 
+  let campaignA: string
+  let campaignB: string
+  let websiteA: string
+  let websiteB: string
+
   beforeAll(async () => {
 
     const [orgAResult, orgBResult] = await Promise.all([
@@ -184,6 +189,46 @@ describe("Phase 1 org isolation", () => {
 
     if (competitorInserts.error) {
       throw competitorInserts.error
+    }
+
+    // Fixtures for the Stage 1 org-scoping fixes (campaigns,
+    // content_items, monitored_websites, tracked_keywords GET routes,
+    // and the ad_sets/landing_page_briefs foreign-lookup rejection).
+    // All four tables cascade-delete on their org_id FK, so afterAll's
+    // existing org deletion cleans these up with no extra code.
+    const [campaignAResult, campaignBResult] = await Promise.all([
+      service.from("campaigns").insert({ org_id: orgGatedA, name: orgName("gated_a") + "_campaign" }).select("id").single(),
+      service.from("campaigns").insert({ org_id: orgGatedB, name: orgName("gated_b") + "_campaign" }).select("id").single()
+    ])
+
+    if (campaignAResult.error || campaignBResult.error) {
+      throw campaignAResult.error || campaignBResult.error
+    }
+
+    campaignA = campaignAResult.data.id
+    campaignB = campaignBResult.data.id
+
+    const [websiteAResult, websiteBResult] = await Promise.all([
+      service.from("monitored_websites").insert({ org_id: orgGatedA, url: "https://a-site.example.com" }).select("id").single(),
+      service.from("monitored_websites").insert({ org_id: orgGatedB, url: "https://b-site.example.com" }).select("id").single()
+    ])
+
+    if (websiteAResult.error || websiteBResult.error) {
+      throw websiteAResult.error || websiteBResult.error
+    }
+
+    websiteA = websiteAResult.data.id
+    websiteB = websiteBResult.data.id
+
+    const scopingFixtureInserts = await service
+      .from("content_items")
+      .insert([
+        { org_id: orgGatedA, type: "blog_idea", title: orgName("gated_a") + "_content", status: "idea" },
+        { org_id: orgGatedB, type: "blog_idea", title: orgName("gated_b") + "_content", status: "idea" }
+      ])
+
+    if (scopingFixtureInserts.error) {
+      throw scopingFixtureInserts.error
     }
 
   })
@@ -409,6 +454,170 @@ describe("Phase 1 org isolation", () => {
     } finally {
 
       await clientC.auth.signOut()
+
+    }
+
+  })
+
+  // Stage 1 fixes: campaigns, content_items, monitored_websites, and
+  // tracked_keywords GET routes used to rely on RLS alone (safe when
+  // every user had exactly one org, a union-of-both-orgs leak once
+  // gated). Each fixed route now resolves the active org via
+  // getCurrentOrgId and adds an explicit .eq("org_id", ...) — these
+  // tests reproduce that exact pattern against real signed-in clients.
+
+  it("6. campaigns GET-pattern only returns the active org's rows", async () => {
+
+    const { getCurrentOrgId } = await import("@/utils/organizations")
+
+    const clientA = await signIn(testEmail("a"))
+
+    try {
+
+      activeOrgCookieValue = orgGatedA
+      const resolvedOrgId = await getCurrentOrgId(clientA)
+
+      const { data, error } =
+        await clientA
+          .from("campaigns")
+          .select("id, org_id")
+          .eq("org_id", resolvedOrgId!)
+
+      expect(error).toBeNull()
+      expect(data).toHaveLength(1)
+      expect(data![0].id).toBe(campaignA)
+
+    } finally {
+
+      activeOrgCookieValue = undefined
+      await clientA.auth.signOut()
+
+    }
+
+  })
+
+  it("7. content_items GET-pattern only returns the active org's rows", async () => {
+
+    const { getCurrentOrgId } = await import("@/utils/organizations")
+
+    const clientA = await signIn(testEmail("a"))
+
+    try {
+
+      activeOrgCookieValue = orgGatedB
+      const resolvedOrgId = await getCurrentOrgId(clientA)
+
+      const { data, error } =
+        await clientA
+          .from("content_items")
+          .select("id, org_id, title")
+          .eq("org_id", resolvedOrgId!)
+
+      expect(error).toBeNull()
+      expect(data).toHaveLength(1)
+      expect(data![0].title).toBe(orgName("gated_b") + "_content")
+
+    } finally {
+
+      activeOrgCookieValue = undefined
+      await clientA.auth.signOut()
+
+    }
+
+  })
+
+  it("8. monitored_websites GET-pattern only returns the active org's rows", async () => {
+
+    const { getCurrentOrgId } = await import("@/utils/organizations")
+
+    const clientA = await signIn(testEmail("a"))
+
+    try {
+
+      activeOrgCookieValue = orgGatedA
+      const resolvedOrgId = await getCurrentOrgId(clientA)
+
+      const { data, error } =
+        await clientA
+          .from("monitored_websites")
+          .select("id, org_id")
+          .eq("org_id", resolvedOrgId!)
+
+      expect(error).toBeNull()
+      expect(data).toHaveLength(1)
+      expect(data![0].id).toBe(websiteA)
+
+    } finally {
+
+      activeOrgCookieValue = undefined
+      await clientA.auth.signOut()
+
+    }
+
+  })
+
+  it("9. tracked_keywords' monitored-website lookup rejects a foreign-org id", async () => {
+
+    const { getCurrentOrgId } = await import("@/utils/organizations")
+
+    const clientA = await signIn(testEmail("a"))
+
+    try {
+
+      // Active org is A, but the site id belongs to org B — the fixed
+      // lookup (.eq("id", ...).eq("org_id", orgId)) must reject this,
+      // exactly like /api/tracked-keywords POST now does, instead of
+      // silently attaching org B's domain to a keyword created under A.
+      activeOrgCookieValue = orgGatedA
+      const resolvedOrgId = await getCurrentOrgId(clientA)
+
+      const { data } =
+        await clientA
+          .from("monitored_websites")
+          .select("id,url")
+          .eq("id", websiteB)
+          .eq("org_id", resolvedOrgId!)
+          .maybeSingle()
+
+      expect(data).toBeNull()
+
+    } finally {
+
+      activeOrgCookieValue = undefined
+      await clientA.auth.signOut()
+
+    }
+
+  })
+
+  it("10. ad_sets' campaign lookup rejects a foreign-org campaignId", async () => {
+
+    const { getCurrentOrgId } = await import("@/utils/organizations")
+
+    const clientA = await signIn(testEmail("a"))
+
+    try {
+
+      // Active org is A, but campaignB belongs to org B — the fixed
+      // lookup must reject this instead of creating the new ad set
+      // under org B while the user thinks they're working in org A.
+      activeOrgCookieValue = orgGatedA
+      const resolvedOrgId = await getCurrentOrgId(clientA)
+
+      const { data } =
+        await clientA
+          .from("campaigns")
+          .select("id, org_id")
+          .eq("id", campaignB)
+          .eq("org_id", resolvedOrgId!)
+          .maybeSingle()
+
+      expect(data).toBeNull()
+
+    } finally {
+
+      activeOrgCookieValue = undefined
+      await clientA.auth.signOut()
 
     }
 

@@ -10,13 +10,29 @@ import {
 export async function GET() {
 
   const supabase = await createClient()
+  const orgId = await getCurrentOrgId(supabase)
 
-  // No manual org_id filter needed here — RLS restricts the result set
-  // to rows in organizations the current session's user belongs to.
+  if (!orgId) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Authentication required."
+      },
+      {
+        status: 401
+      }
+    )
+  }
+
+  // RLS alone only proves membership in SOME org the user belongs to --
+  // a gated multi-org user legitimately has RLS visibility into every
+  // org they're in, not just the active one. Without this explicit
+  // filter, a two-org user's content list was a union of both orgs.
   const response =
     await supabase
       .from("content_items")
       .select("*")
+      .eq("org_id", orgId)
       .order("created_at", {
         ascending: false
       })

@@ -39,13 +39,30 @@ function isMissingDiagnosticsColumn(
 export async function GET() {
 
   const supabase = await createClient()
+  const orgId = await getCurrentOrgId(supabase)
 
-  // No manual org_id filter needed here — RLS restricts the result set
-  // to rows in organizations the current session's user belongs to.
+  if (!orgId) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Authentication required."
+      },
+      {
+        status: 401
+      }
+    )
+  }
+
+  // RLS alone only proves membership in SOME org the user belongs to --
+  // a gated multi-org user legitimately has RLS visibility into every
+  // org they're in, not just the active one. Without this explicit
+  // filter, a two-org user's monitored-website list was a union of
+  // both orgs.
   const response =
     await supabase
       .from("monitored_websites")
       .select(monitoredWebsiteSelect)
+      .eq("org_id", orgId)
       .order("created_at", {
         ascending: false
       })
@@ -60,6 +77,7 @@ export async function GET() {
       await supabase
         .from("monitored_websites")
         .select(fallbackMonitoredWebsiteSelect)
+        .eq("org_id", orgId)
         .order("created_at", {
           ascending: false
         })

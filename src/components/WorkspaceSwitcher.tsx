@@ -85,6 +85,16 @@ export default function WorkspaceSwitcher() {
       // remounted it, even though the underlying data had switched.
       setActiveOrgId(orgId)
 
+      // Same problem one level up: any client component that loads
+      // org-scoped data itself (rather than through a server component
+      // router.refresh() can re-render) — e.g. the dashboard's audit
+      // list, which queries Supabase directly from the browser — has
+      // no way to know a switch happened. router.refresh() doesn't
+      // re-run an already-mounted client component's effects, so
+      // without this event those loaders kept showing the previous
+      // org's data until a full page reload.
+      window.dispatchEvent(new Event("verolyx:workspace-switched"))
+
       router.push("/dashboard")
       router.refresh()
 
