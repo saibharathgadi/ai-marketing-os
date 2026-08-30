@@ -23,12 +23,21 @@ export async function GET() {
     data: { user }
   } = await supabase.auth.getUser()
 
-  // No manual org_id filter needed here — RLS restricts the result set
-  // to rows in organizations the current session's user belongs to.
+  // RLS alone isn't enough to scope this to "the current workspace's
+  // team" — since Phase 1, a gated user can belong to more than one
+  // org, and RLS legitimately allows them to see membership/invite rows
+  // across every org they're in, not just the active one. Without this
+  // explicit org_id filter, a multi-org user's Team page showed a
+  // mashed-together union of both orgs' rows (their own membership
+  // appearing twice, once per org, with different roles), which in turn
+  // made currentUserRole below pick whichever org's row happened to
+  // sort first — showing owner-only actions (like "Invite a teammate")
+  // even while viewing a workspace where they're only a member.
   const { data: members, error: membersError } =
     await supabase
       .from("organization_members")
       .select("id,user_id,email,role,created_at")
+      .eq("org_id", orgId)
       .order("created_at", {
         ascending: true
       })
@@ -53,11 +62,13 @@ export async function GET() {
   }
 
   // Pending invites are owner-only via RLS — a non-owner's query
-  // simply returns an empty array here, not an error.
+  // simply returns an empty array here, not an error. Same org_id
+  // scoping issue as members above applies here too.
   const { data: invites } =
     await supabase
       .from("organization_invites")
       .select("id,email,status,created_at,expires_at")
+      .eq("org_id", orgId)
       .eq("status", "pending")
       .order("created_at", {
         ascending: false
