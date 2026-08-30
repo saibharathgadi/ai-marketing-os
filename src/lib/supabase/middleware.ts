@@ -4,6 +4,14 @@ import { isSafeRedirectPath } from "@/lib/utils"
 
 const publicPaths = ["/login", "/"]
 
+const protectedPagePrefixes = [
+  "/campaigns",
+  "/content",
+  "/dashboard",
+  "/keywords",
+  "/settings"
+]
+
 function isPublicPath(pathname: string) {
   return (
     publicPaths.some(
@@ -33,6 +41,12 @@ function isPublicPath(pathname: string) {
     // Stripe's webhook POST carries no Supabase session cookie; the
     // route verifies the request itself via its signing secret.
     pathname === "/api/webhooks/stripe"
+  )
+}
+
+function isProtectedPage(pathname: string) {
+  return protectedPagePrefixes.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`)
   )
 }
 
@@ -81,19 +95,19 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  if (!user && !isPublicPath(pathname)) {
-    if (pathname.startsWith("/api")) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Authentication required."
-        },
-        {
-          status: 401
-        }
-      )
-    }
+  if (!user && pathname.startsWith("/api") && !isPublicPath(pathname)) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Authentication required."
+      },
+      {
+        status: 401
+      }
+    )
+  }
 
+  if (!user && isProtectedPage(pathname)) {
     const loginUrl = new URL("/login", request.url)
 
     return NextResponse.redirect(loginUrl)

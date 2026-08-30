@@ -6,9 +6,13 @@ import { AppToastProvider } from "@/components/ToastProvider"
 import { InlineScript } from "@/components/InlineScript"
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://verolyx.in"),
   title: "Verolyx",
   description:
-    "The AI platform for SEO, AEO, GEO, content, and campaigns."
+    "The AI platform for SEO, AEO, GEO, content, and campaigns.",
+  alternates: {
+    canonical: "/"
+  }
 }
 
 // Runs before hydration so the correct theme is applied on first paint —

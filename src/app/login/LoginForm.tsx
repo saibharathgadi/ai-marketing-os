@@ -9,6 +9,8 @@ import { Card } from "@/components/ui/card"
 import { useTheme } from "@/components/ThemeProvider"
 import { isSafeRedirectPath } from "@/lib/utils"
 
+const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+
 type GoogleCredentialResponse = {
   credential: string
 }
@@ -71,6 +73,7 @@ export default function LoginForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
+  const [googleSignInReady, setGoogleSignInReady] = useState(false)
 
   const [error, setError] = useState(() =>
     searchParams.get("error") === "oauth"
@@ -118,9 +121,9 @@ export default function LoginForm() {
 
   async function initializeGoogleSignIn() {
 
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+    const googleButtonElement = googleButtonRef.current
 
-    if (!clientId || !window.google || !googleButtonRef.current) {
+    if (!googleClientId || !window.google || !googleButtonElement) {
       return
     }
 
@@ -128,19 +131,23 @@ export default function LoginForm() {
     rawNonceRef.current = raw
 
     window.google.accounts.id.initialize({
-      client_id: clientId,
+      client_id: googleClientId,
       callback: handleGoogleCredential,
       nonce: hashed
     })
 
+    googleButtonElement.innerHTML = ""
+
     window.google.accounts.id.renderButton(
-      googleButtonRef.current,
+      googleButtonElement,
       {
         theme: theme === "dark" ? "filled_black" : "outline",
         size: "large",
         width: 368
       }
     )
+
+    setGoogleSignInReady(true)
 
   }
 
@@ -227,11 +234,13 @@ export default function LoginForm() {
 
     <main className="relative min-h-screen bg-background text-foreground flex items-center justify-center overflow-hidden">
 
-      <Script
-        src="https://accounts.google.com/gsi/client"
-        strategy="afterInteractive"
-        onLoad={initializeGoogleSignIn}
-      />
+      {googleClientId && (
+        <Script
+          src="https://accounts.google.com/gsi/client"
+          strategy="afterInteractive"
+          onLoad={initializeGoogleSignIn}
+        />
+      )}
 
       <div
         aria-hidden="true"
@@ -248,18 +257,28 @@ export default function LoginForm() {
           Access your marketing dashboard.
         </p>
 
-        <div ref={googleButtonRef} className="mt-8 flex justify-center" />
+        {googleClientId && (
+          <>
+            <div ref={googleButtonRef} className="mt-8 flex justify-center" />
 
-        <div className="mt-6 flex items-center gap-3 text-xs text-muted-foreground">
-          <div className="h-px flex-1 bg-border" />
-          or continue with email
-          <div className="h-px flex-1 bg-border" />
-        </div>
+            {googleSignInReady && (
+              <div className="mt-6 flex items-center gap-3 text-xs text-muted-foreground">
+                <div className="h-px flex-1 bg-border" />
+                or continue with email
+                <div className="h-px flex-1 bg-border" />
+              </div>
+            )}
+          </>
+        )}
 
         <div className="mt-6 space-y-4">
 
           <input
             type="email"
+            name="email"
+            aria-label="Email address"
+            autoComplete="email"
+            required
             placeholder="Email"
             value={email}
             onChange={(e) =>
@@ -270,6 +289,10 @@ export default function LoginForm() {
 
           <input
             type="password"
+            name="password"
+            aria-label="Password"
+            autoComplete="current-password"
+            required
             placeholder="Password"
             value={password}
             onChange={(e) =>

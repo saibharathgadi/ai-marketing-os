@@ -317,6 +317,10 @@ export default function HomeClient() {
 
             <input
               type="text"
+              name="website-url"
+              aria-label="Website URL"
+              autoComplete="url"
+              inputMode="url"
               placeholder="https://example.com"
               value={url}
               onChange={(e) =>
