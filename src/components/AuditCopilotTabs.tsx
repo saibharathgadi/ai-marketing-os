@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import {
   Tabs,
   TabsContent,
@@ -120,11 +121,13 @@ function EmptyState({ label }: { label: string }) {
 export default function AuditCopilotTabs({
   aiInsights,
   auditId,
-  siteUrl
+  siteUrl,
+  hasBrandProfile
 }: {
   aiInsights: AIInsights
   auditId: string
   siteUrl: string
+  hasBrandProfile?: boolean
 }) {
   const contentIdeas = aiInsights.contentIdeas || []
   const blogIdeas = contentIdeas.filter((idea) => idea.type === "blog")
@@ -265,6 +268,25 @@ export default function AuditCopilotTabs({
         Explore the ideas below and save the ones you want — they&apos;ll show up in Content
         Studio or Campaign Builder, ready to build out.
       </p>
+
+      {hasBrandProfile ? (
+
+        <p className="text-xs text-violet-400 mt-2">
+          Personalized using your Brand Profile — tone, audience, and differentiators are
+          reflected in the ideas below.
+        </p>
+
+      ) : (
+
+        <p className="text-xs text-muted-foreground mt-2">
+          Add a{" "}
+          <Link href="/settings/brand" className="underline hover:text-foreground">
+            Brand Profile
+          </Link>{" "}
+          to ground these ideas in your actual business instead of generic advice.
+        </p>
+
+      )}
 
       <Tabs defaultValue="overview" className="mt-6">
         <TabsList variant="line" className="border-b border-border pb-0">

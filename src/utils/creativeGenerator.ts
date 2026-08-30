@@ -1,11 +1,19 @@
 import { generateStructuredJSON } from "./aiProvider"
 import { contentItemTypeLabels, type ContentItemType } from "./contentItems"
 
+type BrandProfileContext = {
+  businessDescription: string | null
+  targetAudience: string | null
+  toneOfVoice: string | null
+  keyDifferentiators: string | null
+} | null
+
 type CreativeGeneratorInput = {
   type: ContentItemType
   title: string
   body: Record<string, unknown>
   notes: string | null
+  brandProfile?: BrandProfileContext
 }
 
 type CreativeVariationDraft = {
@@ -39,8 +47,12 @@ function buildPrompts(input: CreativeGeneratorInput) {
     "You are a marketing copywriter. Given a content idea, generate " +
     "exactly 3 distinct creative variations, each a short headline plus " +
     "1-2 sentences of supporting copy. Vary the angle across the three " +
-    "(e.g. benefit-led, curiosity-led, urgency-led). Return JSON only, " +
-    'matching this exact structure: {"variations":[{"headline":"...",' +
+    "(e.g. benefit-led, curiosity-led, urgency-led). If brandProfile " +
+    "context is present, write in the stated tone of voice, targeted at " +
+    "the stated audience, and reflecting the stated differentiators. If " +
+    "brandProfile is absent, proceed exactly as you would without it. " +
+    "Return JSON only, matching this exact structure: " +
+    '{"variations":[{"headline":"...",' +
     '"body":"..."},{"headline":"...","body":"..."},{"headline":"...",' +
     '"body":"..."}]}'
 
@@ -50,7 +62,19 @@ function buildPrompts(input: CreativeGeneratorInput) {
     `Content type: ${contentItemTypeLabels[input.type]}`,
     `Title: ${input.title}`,
     input.notes ? `Notes: ${input.notes}` : null,
-    bodySummary ? `Additional context:\n${bodySummary}` : null
+    bodySummary ? `Additional context:\n${bodySummary}` : null,
+    input.brandProfile?.businessDescription
+      ? `Business: ${input.brandProfile.businessDescription}`
+      : null,
+    input.brandProfile?.targetAudience
+      ? `Target audience: ${input.brandProfile.targetAudience}`
+      : null,
+    input.brandProfile?.toneOfVoice
+      ? `Tone of voice: ${input.brandProfile.toneOfVoice}`
+      : null,
+    input.brandProfile?.keyDifferentiators
+      ? `Key differentiators: ${input.brandProfile.keyDifferentiators}`
+      : null
   ]
     .filter(Boolean)
     .join("\n\n")

@@ -280,6 +280,25 @@ export default async function AuditDetailPage({
 
   }
 
+  // Brand Profile silently shapes what the AI generates (tone, audience,
+  // differentiators — see fetchBrandProfile in aiCopilot.ts) but was
+  // never visible anywhere in this UI, so there was no way to tell
+  // whether a given audit's ideas were actually grounded in it or not.
+  let hasBrandProfile = false
+
+  if (currentAudit?.org_id) {
+
+    const { data: brandProfileRow } =
+      await supabase
+        .from("brand_profiles")
+        .select("id")
+        .eq("org_id", currentAudit.org_id)
+        .maybeSingle()
+
+    hasBrandProfile = Boolean(brandProfileRow)
+
+  }
+
   const currentPages =
     (pages || []) as CrawledPageRow[]
 
@@ -580,6 +599,7 @@ export default async function AuditDetailPage({
             aiInsights={currentAudit.ai_insights as AIInsights}
             auditId={currentAudit.id}
             siteUrl={currentAudit.url}
+            hasBrandProfile={hasBrandProfile}
           />
 
         )}

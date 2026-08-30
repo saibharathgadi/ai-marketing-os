@@ -72,12 +72,27 @@ export async function POST(
     )
   }
 
+  const { data: brandProfile } =
+    await supabase
+      .from("brand_profiles")
+      .select("business_description,target_audience,tone_of_voice,key_differentiators")
+      .eq("org_id", item.org_id)
+      .maybeSingle()
+
   const generated =
     await generateCreativeVariations({
       type: item.type,
       title: item.title,
       body: item.body || {},
-      notes: item.notes
+      notes: item.notes,
+      brandProfile: brandProfile
+        ? {
+            businessDescription: brandProfile.business_description,
+            targetAudience: brandProfile.target_audience,
+            toneOfVoice: brandProfile.tone_of_voice,
+            keyDifferentiators: brandProfile.key_differentiators
+          }
+        : null
     })
 
   const generatedAt = new Date().toISOString()
