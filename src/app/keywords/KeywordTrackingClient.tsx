@@ -6,6 +6,19 @@ import { analyzeCitationTrend } from "@/utils/citationTrend"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import {
+  ActivityIcon,
+  CheckCircle2Icon,
+  CircleDashedIcon,
+  CrosshairIcon,
+  Globe2Icon,
+  PauseCircleIcon,
+  PlayCircleIcon,
+  RefreshCwIcon,
+  SearchIcon,
+  Trash2Icon,
+  TrendingUpIcon
+} from "lucide-react"
 
 type KeywordCheck = {
   was_cited: boolean
@@ -44,6 +57,25 @@ export default function KeywordTrackingClient() {
   const [loading, setLoading] = useState(false)
   const [checkingNow, setCheckingNow] = useState(false)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
+
+  const hasKeyword =
+    keyword.trim().length > 0
+
+  const hasTarget =
+    Boolean(monitoredWebsiteId) || targetDomain.trim().length > 0
+
+  const canTrackKeyword =
+    hasKeyword && hasTarget && !loading
+
+  const activeKeywordCount =
+    trackedKeywords.filter((item) => item.status === "active").length
+
+  const latestCitedCount =
+    trackedKeywords.filter((item) => item.keyword_checks?.[0]?.was_cited)
+      .length
+
+  const pausedKeywordCount =
+    trackedKeywords.filter((item) => item.status === "paused").length
 
   useEffect(() => {
 
@@ -92,9 +124,20 @@ export default function KeywordTrackingClient() {
 
   async function handleAddKeyword() {
 
-    if (!keyword.trim()) return
+    if (!hasKeyword) {
+      setStatusMessage("Enter a keyword to track.")
+      return
+    }
+
+    if (!hasTarget) {
+      setStatusMessage(
+        "Select a monitored website or enter a target domain."
+      )
+      return
+    }
 
     setLoading(true)
+    setStatusMessage(null)
 
     try {
 
@@ -272,231 +315,395 @@ export default function KeywordTrackingClient() {
 
   return (
 
-    <main className="relative min-h-screen bg-background text-foreground">
+    <main className="relative min-h-screen bg-background text-foreground bg-[image:var(--gradient-glow)] bg-no-repeat">
 
-      <div className="max-w-5xl mx-auto px-6 py-12">
+      <div className="max-w-6xl mx-auto px-6 py-12">
 
-        <h1 className="text-3xl font-bold">
-          Keyword Tracking
-        </h1>
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
 
-        <p className="text-muted-foreground mt-2">
-          Track whether AI search (ChatGPT, Perplexity, Google AI
-          Overviews) currently cites your site for the keywords that
-          matter to you, and see which competitors it cites instead.
-        </p>
+          <div>
+            <Badge variant="outline" className="mb-4">
+              <ActivityIcon data-icon="inline-start" />
+              AI visibility monitor
+            </Badge>
+
+            <h1 className="text-3xl font-bold">
+              Keyword Tracking
+            </h1>
+
+            <p className="max-w-2xl text-muted-foreground mt-2">
+              Track whether AI search cites your site for the
+              keywords that matter, and see which competitors are
+              being surfaced instead.
+            </p>
+          </div>
+
+          <Button
+            onClick={handleCheckNow}
+            disabled={checkingNow || trackedKeywords.length === 0}
+            size="lg"
+            className="h-auto py-3 px-5"
+            title={
+              trackedKeywords.length === 0
+                ? "Add a keyword before running checks."
+                : undefined
+            }
+          >
+            <RefreshCwIcon
+              data-icon="inline-start"
+              className={checkingNow ? "animate-spin" : undefined}
+            />
+            {checkingNow ? "Checking" : "Check now"}
+          </Button>
+
+        </div>
+
+        <div className="grid gap-4 mt-8 sm:grid-cols-3">
+
+          <div className="rounded-xl border border-border bg-card/80 p-4 shadow-[var(--shadow-card)]">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-muted-foreground">Active</p>
+              <CrosshairIcon className="size-4 text-primary" />
+            </div>
+            <p className="mt-3 text-3xl font-semibold">
+              {activeKeywordCount}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-border bg-card/80 p-4 shadow-[var(--shadow-card)]">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-muted-foreground">Cited now</p>
+              <CheckCircle2Icon className="size-4 text-emerald-500" />
+            </div>
+            <p className="mt-3 text-3xl font-semibold">
+              {latestCitedCount}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-border bg-card/80 p-4 shadow-[var(--shadow-card)]">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-muted-foreground">Paused</p>
+              <PauseCircleIcon className="size-4 text-amber-500" />
+            </div>
+            <p className="mt-3 text-3xl font-semibold">
+              {pausedKeywordCount}
+            </p>
+          </div>
+
+        </div>
 
         <Card className="rounded-2xl border border-border bg-card p-6 mt-8">
 
-          <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.6fr)]">
 
-            <div>
-              <h2 className="text-xl font-semibold">
-                Tracked Keywords
-              </h2>
-            </div>
+            <div className="rounded-xl border border-border bg-background/70 p-5">
 
-            <Button
-              onClick={handleCheckNow}
-              disabled={checkingNow}
-              size="lg"
-              className="h-auto py-3 px-6"
-            >
-              {checkingNow ? "Checking…" : "Check Keywords Now"}
-            </Button>
-
-          </div>
-
-          <div className="flex flex-col md:flex-row gap-4 mt-8">
-
-            <input
-              type="text"
-              placeholder="e.g. best project management software"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              className="flex-1 rounded-xl bg-background border border-border px-5 py-4 outline-none focus:border-violet-500"
-            />
-
-            <select
-              value={monitoredWebsiteId}
-              onChange={(e) => setMonitoredWebsiteId(e.target.value)}
-              className="rounded-xl bg-background border border-border px-5 py-4 outline-none focus:border-violet-500"
-            >
-              <option value="">No monitored website</option>
-              {monitoredWebsites.map((website) => (
-                <option key={website.id} value={website.id}>
-                  {website.url}
-                </option>
-              ))}
-            </select>
-
-            {!monitoredWebsiteId && (
-              <input
-                type="text"
-                placeholder="Target domain (e.g. example.com)"
-                value={targetDomain}
-                onChange={(e) => setTargetDomain(e.target.value)}
-                className="flex-1 rounded-xl bg-background border border-border px-5 py-4 outline-none focus:border-violet-500"
-              />
-            )}
-
-            <Button
-              onClick={handleAddKeyword}
-              disabled={loading}
-              variant="outline"
-              size="lg"
-              className="h-auto py-4 px-6"
-            >
-              {loading ? "Tracking…" : "Track Keyword"}
-            </Button>
-
-          </div>
-
-          {statusMessage && (
-            <div className="mt-5 rounded-xl border border-border bg-background p-4 text-sm text-foreground">
-              {statusMessage}
-            </div>
-          )}
-
-          <div className="space-y-4 mt-8">
-
-            {trackedKeywords.length === 0 ? (
-
-              <div className="rounded-xl bg-background p-5 text-muted-foreground">
-                No tracked keywords yet.
+              <div className="flex items-start gap-3">
+                <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <SearchIcon className="size-4" />
+                </span>
+                <div>
+                  <h2 className="text-lg font-semibold">
+                    Add keyword
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Choose the query and the site you want AI answers
+                    to cite.
+                  </p>
+                </div>
               </div>
 
-            ) : (
+              <div className="mt-6 space-y-4">
 
-              trackedKeywords.map((tracked) => {
-
-                const [latestCheck, previousCheck] =
-                  tracked.keyword_checks || []
-
-                const trend =
-                  analyzeCitationTrend({
-                    currentCheck: latestCheck,
-                    previousCheck
-                  })
-
-                return (
-
-                  <div
-                    key={tracked.id}
-                    className="rounded-xl bg-background p-5 flex flex-col lg:flex-row lg:items-start justify-between gap-4"
+                <div>
+                  <label
+                    className="text-sm font-medium"
+                    htmlFor="keyword-to-track"
                   >
+                    Keyword
+                  </label>
+                  <input
+                    id="keyword-to-track"
+                    type="text"
+                    placeholder="e.g. best project management software"
+                    value={keyword}
+                    onChange={(e) => {
+                      setKeyword(e.target.value)
+                      setStatusMessage(null)
+                    }}
+                    className="mt-2 w-full rounded-xl bg-card border border-border px-4 py-3 outline-none transition focus:border-primary focus:ring-3 focus:ring-ring/30"
+                  />
+                </div>
 
-                    <div>
+                <div>
+                  <label
+                    className="text-sm font-medium"
+                    htmlFor="monitored-website"
+                  >
+                    Website
+                  </label>
+                  <div className="relative mt-2">
+                    <Globe2Icon className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <select
+                      id="monitored-website"
+                      value={monitoredWebsiteId}
+                      onChange={(e) => {
+                        setMonitoredWebsiteId(e.target.value)
+                        setStatusMessage(null)
+                      }}
+                      className="w-full appearance-none rounded-xl bg-card border border-border py-3 pl-10 pr-4 outline-none transition focus:border-primary focus:ring-3 focus:ring-ring/30"
+                    >
+                      <option value="">Use a custom domain</option>
+                      {monitoredWebsites.map((website) => (
+                        <option key={website.id} value={website.id}>
+                          {website.url}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
 
-                      <div className="flex items-center gap-2 flex-wrap">
+                {!monitoredWebsiteId && (
+                  <div>
+                    <label
+                      className="text-sm font-medium"
+                      htmlFor="target-domain"
+                    >
+                      Target domain
+                    </label>
+                    <input
+                      id="target-domain"
+                      type="text"
+                      placeholder="example.com"
+                      value={targetDomain}
+                      onChange={(e) => {
+                        setTargetDomain(e.target.value)
+                        setStatusMessage(null)
+                      }}
+                      className="mt-2 w-full rounded-xl bg-card border border-border px-4 py-3 outline-none transition focus:border-primary focus:ring-3 focus:ring-ring/30"
+                    />
+                  </div>
+                )}
 
-                        <h3 className="text-lg font-semibold">
-                          {tracked.keyword}
-                        </h3>
+                <Button
+                  onClick={handleAddKeyword}
+                  disabled={!canTrackKeyword}
+                  size="lg"
+                  className="h-auto w-full py-3"
+                  title={
+                    canTrackKeyword
+                      ? undefined
+                      : "Enter a keyword and target before tracking."
+                  }
+                >
+                  <CrosshairIcon data-icon="inline-start" />
+                  {loading ? "Tracking" : "Track keyword"}
+                </Button>
 
-                        {latestCheck && (
-                          <Badge
-                            variant={
-                              latestCheck.was_cited
-                                ? "default"
-                                : "secondary"
-                            }
-                          >
-                            {latestCheck.was_cited
-                              ? "Cited"
-                              : "Not Cited"}
-                          </Badge>
-                        )}
+                {!canTrackKeyword && !loading && (
+                  <p className="text-sm text-muted-foreground">
+                    Enter a keyword, then select a monitored website or
+                    add a target domain.
+                  </p>
+                )}
 
-                        {trend.hasEnoughHistory &&
-                          (trend.status === "Gained" ||
-                            trend.status === "Lost") && (
-                            <Badge
-                              variant={
-                                trend.status === "Gained"
-                                  ? "default"
-                                  : "destructive"
-                              }
-                            >
-                              {trend.status === "Gained"
-                                ? "▲ Gained"
-                                : "▼ Lost"}
-                            </Badge>
-                          )}
+                {statusMessage && (
+                  <div className="rounded-xl border border-border bg-card p-3 text-sm text-foreground">
+                    {statusMessage}
+                  </div>
+                )}
 
-                        {tracked.status === "paused" && (
-                          <Badge variant="outline">Paused</Badge>
-                        )}
+              </div>
 
-                      </div>
+            </div>
 
-                      <p className="text-muted-foreground text-sm mt-2">
-                        Target: {tracked.target_domain}
-                      </p>
+            <div>
 
-                      <p className="text-muted-foreground text-sm mt-1">
-                        Last checked:{" "}
-                        {latestCheck
-                          ? formatLocalTimestamp(latestCheck.created_at)
-                          : "Never"}
-                      </p>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold">
+                    Visibility watchlist
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Latest citation status by target domain.
+                  </p>
+                </div>
+                <Badge variant="secondary">
+                  {trackedKeywords.length} total
+                </Badge>
+              </div>
 
-                      {latestCheck &&
-                        latestCheck.competitor_domains.length > 0 && (
+              <div className="space-y-3 mt-5">
 
-                          <div className="mt-3 flex flex-wrap gap-2">
+                {trackedKeywords.length === 0 ? (
 
-                            {latestCheck.competitor_domains.map(
-                              (domain) => (
+                  <div className="rounded-xl border border-dashed border-border bg-background/70 p-8 text-center">
+                    <CircleDashedIcon className="mx-auto size-8 text-muted-foreground" />
+                    <h3 className="mt-4 font-semibold">
+                      No keywords yet
+                    </h3>
+                    <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">
+                      Add your first keyword to start tracking AI
+                      citation coverage against your domain.
+                    </p>
+                  </div>
+
+                ) : (
+
+                  trackedKeywords.map((tracked) => {
+
+                    const [latestCheck, previousCheck] =
+                      tracked.keyword_checks || []
+
+                    const trend =
+                      analyzeCitationTrend({
+                        currentCheck: latestCheck,
+                        previousCheck
+                      })
+
+                    return (
+
+                      <div
+                        key={tracked.id}
+                        className="rounded-xl border border-border bg-background/70 p-4 transition hover:border-primary/40 hover:bg-background"
+                      >
+
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+
+                          <div className="min-w-0">
+
+                            <div className="flex items-center gap-2 flex-wrap">
+
+                              <h3 className="text-base font-semibold">
+                                {tracked.keyword}
+                              </h3>
+
+                              {latestCheck ? (
                                 <Badge
-                                  key={domain}
-                                  variant="outline"
+                                  variant={
+                                    latestCheck.was_cited
+                                      ? "default"
+                                      : "secondary"
+                                  }
                                 >
-                                  {domain}
+                                  {latestCheck.was_cited
+                                    ? "Cited"
+                                    : "Not cited"}
                                 </Badge>
-                              )
-                            )}
+                              ) : (
+                                <Badge variant="outline">Unchecked</Badge>
+                              )}
+
+                              {trend.hasEnoughHistory &&
+                                (trend.status === "Gained" ||
+                                  trend.status === "Lost") && (
+                                  <Badge
+                                    variant={
+                                      trend.status === "Gained"
+                                        ? "default"
+                                        : "destructive"
+                                    }
+                                  >
+                                    <TrendingUpIcon data-icon="inline-start" />
+                                    {trend.status}
+                                  </Badge>
+                                )}
+
+                              {tracked.status === "paused" && (
+                                <Badge variant="outline">Paused</Badge>
+                              )}
+
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
+                              <span className="inline-flex items-center gap-1.5">
+                                <Globe2Icon className="size-4" />
+                                {tracked.target_domain}
+                              </span>
+                              <span>
+                                Last checked:{" "}
+                                {latestCheck
+                                  ? formatLocalTimestamp(
+                                      latestCheck.created_at
+                                    )
+                                  : "Never"}
+                              </span>
+                            </div>
+
+                            {latestCheck &&
+                              latestCheck.competitor_domains.length > 0 && (
+
+                                <div className="mt-4">
+                                  <p className="text-xs uppercase text-muted-foreground">
+                                    Competitors cited
+                                  </p>
+                                  <div className="mt-2 flex flex-wrap gap-2">
+
+                                    {latestCheck.competitor_domains.map(
+                                      (domain) => (
+                                        <Badge
+                                          key={domain}
+                                          variant="outline"
+                                        >
+                                          {domain}
+                                        </Badge>
+                                      )
+                                    )}
+
+                                  </div>
+                                </div>
+
+                              )}
 
                           </div>
 
-                        )}
+                          <div className="flex shrink-0 gap-2">
 
-                    </div>
+                            <Button
+                              onClick={() =>
+                                handleToggleStatus(
+                                  tracked.id,
+                                  tracked.status
+                                )
+                              }
+                              variant="outline"
+                              size="sm"
+                            >
+                              {tracked.status === "active" ? (
+                                <PauseCircleIcon data-icon="inline-start" />
+                              ) : (
+                                <PlayCircleIcon data-icon="inline-start" />
+                              )}
+                              {tracked.status === "active"
+                                ? "Pause"
+                                : "Resume"}
+                            </Button>
 
-                    <div className="flex gap-3">
+                            <Button
+                              onClick={() => handleDelete(tracked.id)}
+                              variant="destructive"
+                              size="sm"
+                              aria-label={`Delete ${tracked.keyword}`}
+                            >
+                              <Trash2Icon data-icon="inline-start" />
+                              Delete
+                            </Button>
 
-                      <Button
-                        onClick={() =>
-                          handleToggleStatus(
-                            tracked.id,
-                            tracked.status
-                          )
-                        }
-                        variant="outline"
-                        className="h-auto py-3 px-5"
-                      >
-                        {tracked.status === "active"
-                          ? "Pause"
-                          : "Resume"}
-                      </Button>
+                          </div>
 
-                      <Button
-                        onClick={() => handleDelete(tracked.id)}
-                        variant="destructive"
-                        className="h-auto py-3 px-5"
-                      >
-                        Delete
-                      </Button>
+                        </div>
 
-                    </div>
+                      </div>
 
-                  </div>
+                    )
 
-                )
+                  })
 
-              })
+                )}
 
-            )}
+              </div>
+
+            </div>
 
           </div>
 
