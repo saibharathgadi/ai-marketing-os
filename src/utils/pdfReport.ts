@@ -1646,7 +1646,7 @@ export async function generatePDFReport(
     "Blog series",
     (aiInsights?.blogSeries || []).flatMap((series) => [
       { text: series.seriesTitle },
-      ...series.posts.map((post) => ({
+      ...(series.posts ?? []).map((post) => ({
         text: post.title,
         indent: true
       }))
@@ -1660,7 +1660,7 @@ export async function generatePDFReport(
     "Social series",
     (aiInsights?.socialSeries || []).flatMap((series) => [
       { text: `[${series.platform}] ${series.seriesTitle}` },
-      ...series.posts.map((post) => ({
+      ...(series.posts ?? []).map((post) => ({
         text: post.hook,
         indent: true
       }))

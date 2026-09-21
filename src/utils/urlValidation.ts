@@ -193,12 +193,29 @@ async function hasOnlySafeResolvedAddresses(
 ): Promise<boolean> {
   let addresses: { address: string }[]
 
+  // dns.lookup has no built-in timeout/AbortSignal option, unlike the
+  // fetch() this hostname is about to be used for — an unresponsive
+  // nameserver could otherwise stall a crawl slot well past the
+  // crawler's own per-page fetch timeout.
+  let timeout: NodeJS.Timeout | undefined
+
   try {
-    addresses = await dns.lookup(hostname, { all: true })
+    addresses = await Promise.race([
+      dns.lookup(hostname, { all: true }),
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(
+          () => reject(new Error("DNS lookup timed out")),
+          5_000
+        )
+      })
+    ])
   } catch {
-    // Unresolvable hostname (NXDOMAIN, etc.) — fail closed, the caller
-    // treats this the same as any other validation failure.
+    // Unresolvable or unresponsive hostname (NXDOMAIN, timeout, etc.)
+    // — fail closed, the caller treats this the same as any other
+    // validation failure.
     return false
+  } finally {
+    clearTimeout(timeout)
   }
 
   return addresses.every(

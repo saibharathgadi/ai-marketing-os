@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { InlineScript } from "@/components/InlineScript"
 
 type AnalyzeResponse = {
   success: boolean
@@ -478,11 +479,9 @@ export default function HomeClient() {
 
       </div>
 
-      <script
+      <InlineScript
         type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(faqStructuredData)
-        }}
+        html={JSON.stringify(faqStructuredData)}
       />
 
     </main>

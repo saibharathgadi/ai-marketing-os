@@ -105,7 +105,16 @@ export async function POST(request: Request) {
     )
   }
 
-  if (!isMultiOrgGatedOrg(requestedOrgId)) {
+  // getCurrentOrgId gates per-*user* (any gated membership turns on
+  // multi-org resolution for that user across ALL their orgs, gated or
+  // not) — gating on whether the *target* org is gated instead would
+  // wrongly 403 a gated user switching into their own ungated org, with
+  // no other path to ever reach it again since nothing else clears the
+  // cookie.
+  const gateActiveForThisUser =
+    memberships.some((m) => isMultiOrgGatedOrg(m.orgId))
+
+  if (!gateActiveForThisUser) {
     return NextResponse.json(
       {
         success: false,

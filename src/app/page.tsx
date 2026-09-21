@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { Suspense } from "react"
 import HomeClient from "./HomeClient"
+import { InlineScript } from "@/components/InlineScript"
 
 const title =
   "Verolyx | AI Platform for SEO, AEO, GEO, Content & Campaigns"
@@ -47,11 +48,9 @@ const softwareApplicationStructuredData = {
 export default function Home() {
   return (
     <>
-      <script
+      <InlineScript
         type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(softwareApplicationStructuredData)
-        }}
+        html={JSON.stringify(softwareApplicationStructuredData)}
       />
       {/* HomeClient reads the ?url= query param via useSearchParams,
           which Next.js requires a Suspense boundary for so the rest of

@@ -16,35 +16,45 @@ async function generateWithGemini(
   input: StructuredJSONInput,
   apiKey: string
 ): Promise<Record<string, unknown> | null> {
-  // "gemini-flash-latest" is a self-updating alias Google provides
-  // specifically so callers don't have to track model version sunsets —
-  // pinned versions (e.g. gemini-2.0-flash) get their free-tier quota
-  // zeroed out once superseded, which is exactly what broke this call
-  // before switching to the alias.
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: input.systemPrompt }]
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 20_000)
+
+  let response: Response
+
+  try {
+    // "gemini-flash-latest" is a self-updating alias Google provides
+    // specifically so callers don't have to track model version sunsets —
+    // pinned versions (e.g. gemini-2.0-flash) get their free-tier quota
+    // zeroed out once superseded, which is exactly what broke this call
+    // before switching to the alias.
+    response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
         },
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: input.userPrompt }]
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [{ text: input.systemPrompt }]
+          },
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: input.userPrompt }]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.4,
+            responseMimeType: "application/json"
           }
-        ],
-        generationConfig: {
-          temperature: 0.4,
-          responseMimeType: "application/json"
-        }
-      })
-    }
-  )
+        }),
+        signal: controller.signal
+      }
+    )
+  } finally {
+    clearTimeout(timeout)
+  }
 
   if (!response.ok) {
     throw new Error(
@@ -68,31 +78,41 @@ async function generateWithOpenAI(
   input: StructuredJSONInput,
   apiKey: string
 ): Promise<Record<string, unknown> | null> {
-  const response = await fetch(
-    "https://api.openai.com/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        temperature: 0.4,
-        response_format: { type: "json_object" },
-        messages: [
-          {
-            role: "system",
-            content: input.systemPrompt
-          },
-          {
-            role: "user",
-            content: input.userPrompt
-          }
-        ]
-      })
-    }
-  )
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 20_000)
+
+  let response: Response
+
+  try {
+    response = await fetch(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          temperature: 0.4,
+          response_format: { type: "json_object" },
+          messages: [
+            {
+              role: "system",
+              content: input.systemPrompt
+            },
+            {
+              role: "user",
+              content: input.userPrompt
+            }
+          ]
+        }),
+        signal: controller.signal
+      }
+    )
+  } finally {
+    clearTimeout(timeout)
+  }
 
   if (!response.ok) {
     throw new Error(

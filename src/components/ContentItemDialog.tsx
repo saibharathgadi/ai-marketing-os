@@ -318,6 +318,11 @@ function ContentItemDialogInner({
 
     if (!item) return
 
+    if (!title.trim()) {
+      setError("Title cannot be empty.")
+      return
+    }
+
     setSaving(true)
     setError(null)
 

@@ -15,6 +15,14 @@ export default defineConfig({
     }
   },
   test: {
+    // Vitest's default include pattern is recursive and would otherwise
+    // also pick up this same test file inside every ai-marketing-os-*
+    // sibling directory (each a separate git-worktree checkout of this
+    // repo) — since these tests hit the one real, shared Supabase
+    // project, running several copies concurrently causes genuine
+    // cross-run race conditions and auth rate-limiting, not real
+    // failures. Scoping to src/ is this project's own test suite only.
+    include: ["src/**/*.{test,spec}.?(c|m)[jt]s?(x)"],
     env: loadEnv("", process.cwd(), ""),
     testTimeout: 30_000,
     hookTimeout: 30_000

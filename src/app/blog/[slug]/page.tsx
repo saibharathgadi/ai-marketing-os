@@ -3,6 +3,7 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { blogPosts, type ContentBlock } from "@/content/blogPosts"
+import { InlineScript } from "@/components/InlineScript"
 
 export function generateStaticParams() {
   return blogPosts.map((post) => ({
@@ -161,11 +162,9 @@ export default async function BlogPostPage({
 
       </div>
 
-      <script
+      <InlineScript
         type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(articleStructuredData)
-        }}
+        html={JSON.stringify(articleStructuredData)}
       />
 
     </main>

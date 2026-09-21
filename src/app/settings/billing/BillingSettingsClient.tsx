@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 import { formatLocalTimestamp } from "@/lib/date"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -33,23 +32,25 @@ export default function BillingSettingsClient() {
 
   useEffect(() => {
 
-    const supabase = createClient()
+    // Goes through a server route (getCurrentOrgId) rather than
+    // querying Supabase directly from the client: a direct .single()
+    // query here has no org_id filter, and RLS alone shows every org a
+    // gated multi-org user belongs to, so .single() would error for
+    // exactly that user (see /api/billing/route.ts's comment).
+    fetch("/api/billing")
+      .then((response) => response.json())
+      .then((result) => {
 
-    supabase
-      .from("organizations")
-      .select(
-        "plan,subscription_status,trial_ends_at,current_period_end"
-      )
-      .single()
-      .then(({ data, error }) => {
-
-        if (error || !data) {
+        if (!result.success) {
           setLoadError(true)
           return
         }
 
-        setOrg(data)
+        setOrg(result.data)
 
+      })
+      .catch(() => {
+        setLoadError(true)
       })
 
   }, [])

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { formatLocalTimestamp } from "@/lib/date"
@@ -190,15 +190,24 @@ export default function DashboardClient() {
   const [bulkDeleting, setBulkDeleting] =
     useState(false)
 
+  // Polled every 2s (below); a slow/cold request can resolve after a
+  // later one that fired after it, and without this guard the older
+  // response's setQueueMetrics would win and show stale counters until
+  // the next tick corrects it. Only apply a response if no newer call
+  // has started since it went out.
+  const diagnosticsRequestId = useRef(0)
+
   const loadDiagnostics = useCallback(
     async () => {
+      const requestId = ++diagnosticsRequestId.current
+
       try {
         const response =
           await fetch("/api/diagnostics")
         const result =
           await response.json()
 
-        if (result.success) {
+        if (result.success && requestId === diagnosticsRequestId.current) {
           setQueueMetrics({
             queued:
               result.queue?.queued || 0,
